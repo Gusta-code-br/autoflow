@@ -1,26 +1,95 @@
 @import "tailwindcss";
 
+@theme {
+  /* Marca */
+  --color-brand-50: #f3f1ff;
+  --color-brand-100: #ebe5ff;
+  --color-brand-200: #d9ceff;
+  --color-brand-300: #bea6ff;
+  --color-brand-400: #9f75ff;
+  --color-brand-500: #843dff;
+  --color-brand-600: #7916ff;
+  --color-brand-700: #6b04fd;
+  --color-brand-800: #5a03d5;
+  --color-brand-900: #4b05ad;
+  --color-brand-950: #2c0076;
+
+  /* Neutros */
+  --color-ink-50: #f8fafc;
+  --color-ink-100: #f1f5f9;
+  --color-ink-200: #e2e8f0;
+  --color-ink-300: #cbd5e1;
+  --color-ink-400: #94a3b8;
+  --color-ink-500: #64748b;
+  --color-ink-600: #475569;
+  --color-ink-700: #334155;
+  --color-ink-800: #1e293b;
+  --color-ink-900: #0f172a;
+  --color-ink-950: #020617;
+
+  /* WhatsApp */
+  --color-zap: #25d366;
+  --color-zap-dark: #128c7e;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html,
+body {
+  background: var(--color-ink-50);
+  color: var(--color-ink-900);
+  -webkit-font-smoothing: antialiased;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-300) transparent;
+}
+
+@keyframes af-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@utility animate-fade-up {
+  animation: af-fade-up 0.35s ease-out both;
+}
+
+@keyframes af-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgb(37 211 102 / 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgb(37 211 102 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(37 211 102 / 0);
+  }
+}
+
+@utility animate-pulse-ring {
+  animation: af-pulse-ring 2s infinite;
+}
+
+/* Fundo do chat estilo WhatsApp */
+@utility chat-bg {
+  background-color: #efeae2;
+  background-image: radial-gradient(
+      circle at 20% 20%,
+      rgb(0 0 0 / 0.03) 1px,
+      transparent 1px
+    ),
+    radial-gradient(circle at 70% 60%, rgb(0 0 0 / 0.03) 1px, transparent 1px);
+  background-size: 28px 28px, 34px 34px;
 }
