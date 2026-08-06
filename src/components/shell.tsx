@@ -1,14 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
-import { useApp } from "@/lib/store";
-import { PLANOS, getPlano } from "@/lib/plans";
+import { usePathname } from "next/navigation";
+import { useState, type ReactNode } from "react";
+
+import { sairAction } from "@/server/actions/auth";
+import { planoMinimoPara } from "@/lib/plans";
 import { numero } from "@/lib/format";
-import type { FeatureKey, PlanId } from "@/lib/types";
+import type { FeatureKey } from "@/lib/types";
+import type { SessaoPainel } from "@/server/dal/painel";
 import { Icon, Logo, type IconName } from "./icons";
-import { Badge, Barra, Botao, cx } from "./ui";
+import { Badge, Barra, Botao } from "./ui";
+import { cx } from "@/lib/cx";
+
+/**
+ * Casco do painel.
+ *
+ * Client component, mas sem estado de negócio: tudo o que ele desenha vem do
+ * `sessao` que o layout (server) carregou. O `useState` aqui só abre e fecha
+ * menu. Isso é o que faz o painel refletir o banco — antes ele lia de um store
+ * de localStorage e por isso continuava mostrando a demo depois do login.
+ */
 
 interface ItemNav {
   href: string;
@@ -52,25 +64,14 @@ const NAV: { grupo: string; itens: ItemNav[] }[] = [
   },
 ];
 
-export function Shell({ children }: { children: ReactNode }) {
-  const app = useApp();
-  const router = useRouter();
+export function Shell({
+  sessao,
+  children,
+}: {
+  sessao: SessaoPainel;
+  children: ReactNode;
+}) {
   const [menuAberto, setMenuAberto] = useState(false);
-
-  useEffect(() => {
-    if (app.pronto && !app.logado) router.replace("/entrar");
-  }, [app.pronto, app.logado, router]);
-
-  if (!app.pronto || !app.logado) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="flex items-center gap-3 text-ink-400">
-          <Logo className="size-8 animate-pulse" />
-          <span className="text-sm">Carregando…</span>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex min-h-screen bg-ink-50">
@@ -81,10 +82,14 @@ export function Shell({ children }: { children: ReactNode }) {
         />
       )}
 
-      <Sidebar aberto={menuAberto} aoNavegar={() => setMenuAberto(false)} />
+      <Sidebar
+        sessao={sessao}
+        aberto={menuAberto}
+        aoNavegar={() => setMenuAberto(false)}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
-        <Topbar aoAbrirMenu={() => setMenuAberto(true)} />
+        <Topbar sessao={sessao} aoAbrirMenu={() => setMenuAberto(true)} />
         <main className="flex-1">{children}</main>
       </div>
     </div>
@@ -92,15 +97,16 @@ export function Shell({ children }: { children: ReactNode }) {
 }
 
 function Sidebar({
+  sessao,
   aberto,
   aoNavegar,
 }: {
+  sessao: SessaoPainel;
   aberto: boolean;
   aoNavegar: () => void;
 }) {
-  const app = useApp();
   const pathname = usePathname();
-  const plano = getPlano(app.conta.planoId);
+  const { creditos, plano } = sessao;
 
   return (
     <aside
@@ -134,7 +140,7 @@ function Sidebar({
                     ? pathname === "/painel"
                     : pathname.startsWith(item.href);
                 const bloqueado = item.feature
-                  ? !app.tem(item.feature)
+                  ? !plano.features.includes(item.feature)
                   : false;
                 return (
                   <li key={item.href}>
@@ -160,8 +166,12 @@ function Sidebar({
                         <Icon name="lock" className="size-3.5 text-ink-300" />
                       )}
                       {item.href === "/painel/atendimento" &&
-                        app.conversas.some((c) => c.naoLidas > 0) && (
+                        sessao.naoLidas > 0 && (
                           <span className="size-2 rounded-full bg-zap" />
+                        )}
+                      {item.href === "/painel/conexoes" &&
+                        sessao.conexoes.comProblema > 0 && (
+                          <span className="size-2 rounded-full bg-rose-500" />
                         )}
                     </Link>
                   </li>
@@ -172,44 +182,52 @@ function Sidebar({
         ))}
       </nav>
 
-      <div className="border-t border-ink-100 p-3">
-        <Link
-          href="/painel/creditos"
-          className="block rounded-xl bg-ink-50 p-3.5 transition-colors hover:bg-ink-100"
-        >
-          <div className="flex items-center justify-between text-[13px]">
-            <span className="font-medium text-ink-700">Créditos de IA</span>
-            <span className="text-ink-500">{app.percentualUso}%</span>
-          </div>
-          <Barra
-            valor={app.percentualUso}
-            tom={
-              app.percentualUso > 90
-                ? "perigo"
-                : app.percentualUso > 70
-                  ? "aviso"
-                  : "marca"
-            }
-            className="mt-2"
-          />
-          <p className="mt-2 text-xs text-ink-500">
-            {numero(app.creditosRestantes)} de {numero(app.creditosTotais)}{" "}
-            mensagens
-          </p>
-          {app.percentualUso > 70 && (
-            <p className="mt-1.5 text-xs font-medium text-brand-700">
-              Recarregar créditos →
+      {/* Atendente não decide compra: mostrar saldo e link de recarga a ele só
+          gera pedido de upgrade que ele não pode fazer. */}
+      {sessao.verFinanceiro && (
+        <div className="border-t border-ink-100 p-3">
+          <Link
+            href="/painel/creditos"
+            className="block rounded-xl bg-ink-50 p-3.5 transition-colors hover:bg-ink-100"
+          >
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="font-medium text-ink-700">Créditos de IA</span>
+              <span className="text-ink-500">{creditos.percentual}%</span>
+            </div>
+            <Barra
+              valor={creditos.percentual}
+              tom={
+                creditos.percentual > 90
+                  ? "perigo"
+                  : creditos.percentual > 70
+                    ? "aviso"
+                    : "marca"
+              }
+              className="mt-2"
+            />
+            <p className="mt-2 text-xs text-ink-500">
+              {numero(creditos.restantes)} de {numero(creditos.totais)} mensagens
             </p>
-          )}
-        </Link>
-      </div>
+            {creditos.percentual > 70 && (
+              <p className="mt-1.5 text-xs font-medium text-brand-700">
+                Recarregar créditos →
+              </p>
+            )}
+          </Link>
+        </div>
+      )}
     </aside>
   );
 }
 
-function Topbar({ aoAbrirMenu }: { aoAbrirMenu: () => void }) {
-  const app = useApp();
-  const [abrirDemo, setAbrirDemo] = useState(false);
+function Topbar({
+  sessao,
+  aoAbrirMenu,
+}: {
+  sessao: SessaoPainel;
+  aoAbrirMenu: () => void;
+}) {
+  const { conexoes, org } = sessao;
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-ink-200 bg-white/85 px-4 backdrop-blur-md lg:px-8">
@@ -222,88 +240,31 @@ function Topbar({ aoAbrirMenu }: { aoAbrirMenu: () => void }) {
       </button>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-ink-900">
-          {app.conta.nomeEmpresa || "Sua empresa"}
-        </p>
+        <p className="truncate text-sm font-semibold text-ink-900">{org.nome}</p>
         <p className="truncate text-xs text-ink-500">
-          {app.conexoes.filter((c) => c.status === "conectado").length} WhatsApp
-          conectado
-          {app.conexoes.filter((c) => c.status === "conectado").length === 1
-            ? ""
-            : "s"}{" "}
-          · IA {app.conta.nomeAtendente || "sem nome"}
+          {conexoes.conectadas} WhatsApp conectado
+          {conexoes.conectadas === 1 ? "" : "s"} · IA {org.nomeAtendente}
         </p>
       </div>
 
-      {/* Seletor de plano — só existe no protótipo, pra demonstrar o gating */}
-      <div className="relative">
-        <button
-          onClick={() => setAbrirDemo((v) => !v)}
-          className="flex h-9 items-center gap-1.5 rounded-lg border border-dashed border-brand-300 bg-brand-50/60 px-2.5 text-[12px] font-medium text-brand-700 hover:bg-brand-50"
-        >
-          <Icon name="eye" className="size-3.5" />
-          <span className="hidden sm:inline">Ver como</span>
-          {getPlano(app.conta.planoId).nome}
-          <Icon name="chevronDown" className="size-3" />
-        </button>
-        {abrirDemo && (
-          <>
-            <div
-              className="fixed inset-0 z-10"
-              onClick={() => setAbrirDemo(false)}
-            />
-            <div className="absolute right-0 top-11 z-20 w-64 rounded-xl border border-ink-200 bg-white p-1.5 shadow-lg">
-              <p className="px-2.5 py-2 text-[11px] leading-snug text-ink-500">
-                Modo demonstração: troque o plano pra ver o que cada um libera.
-              </p>
-              {PLANOS.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => {
-                    app.atualizarConta({ planoId: p.id as PlanId });
-                    setAbrirDemo(false);
-                    app.notificar(`Visualizando como plano ${p.nome}.`, "info");
-                  }}
-                  className={cx(
-                    "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors",
-                    app.conta.planoId === p.id
-                      ? "bg-brand-50 font-medium text-brand-800"
-                      : "text-ink-600 hover:bg-ink-50",
-                  )}
-                >
-                  <span className="flex-1">{p.nome}</span>
-                  <span className="text-[11px] text-ink-400">
-                    {p.features.length} módulo
-                    {p.features.length > 1 ? "s" : ""}
-                  </span>
-                </button>
-              ))}
-              <div className="mt-1 border-t border-ink-100 pt-1">
-                <button
-                  onClick={() => {
-                    app.resetarDemo();
-                    setAbrirDemo(false);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink-500 hover:bg-ink-50"
-                >
-                  <Icon name="refresh" className="size-3.5" />
-                  Reiniciar dados do protótipo
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+      {conexoes.conectadas === 0 && (
+        <Link href="/painel/conexoes" className="hidden sm:block">
+          <Botao tamanho="sm" icone="plug">
+            Conectar WhatsApp
+          </Botao>
+        </Link>
+      )}
 
-      <MenuUsuario />
+      <MenuUsuario sessao={sessao} />
     </header>
   );
 }
 
-function MenuUsuario() {
-  const app = useApp();
-  const router = useRouter();
+function MenuUsuario({ sessao }: { sessao: SessaoPainel }) {
   const [aberto, setAberto] = useState(false);
+  const iniciais = (sessao.usuario.nome || sessao.org.nome || "AF")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="relative">
@@ -312,7 +273,7 @@ function MenuUsuario() {
         className="flex size-9 items-center justify-center rounded-full bg-brand-100 text-[13px] font-semibold text-brand-700 hover:bg-brand-200"
         aria-label="Menu do usuário"
       >
-        {(app.conta.nomeEmpresa || "AF").slice(0, 2).toUpperCase()}
+        {iniciais}
       </button>
       {aberto && (
         <>
@@ -320,11 +281,14 @@ function MenuUsuario() {
           <div className="absolute right-0 top-11 z-20 w-60 rounded-xl border border-ink-200 bg-white p-1.5 shadow-lg">
             <div className="px-2.5 py-2">
               <p className="truncate text-sm font-medium text-ink-900">
-                {app.conta.nomeEmpresa || "Sua empresa"}
+                {sessao.usuario.nome}
               </p>
               <p className="truncate text-xs text-ink-500">
-                {app.conta.email || "—"}
+                {sessao.usuario.email}
               </p>
+              <Badge tom="neutro" className="mt-1.5">
+                {sessao.usuario.papel}
+              </Badge>
             </div>
             <div className="border-t border-ink-100 pt-1">
               <Link
@@ -335,24 +299,30 @@ function MenuUsuario() {
                 <Icon name="gear" className="size-4 text-ink-400" />
                 Ajustes
               </Link>
-              <Link
-                href="/painel/creditos"
-                onClick={() => setAberto(false)}
-                className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] text-ink-600 hover:bg-ink-50"
-              >
-                <Icon name="card" className="size-4 text-ink-400" />
-                Plano e faturas
-              </Link>
-              <button
-                onClick={() => {
-                  app.sair();
-                  router.push("/");
-                }}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink-600 hover:bg-ink-50"
-              >
-                <Icon name="logout" className="size-4 text-ink-400" />
-                Sair
-              </button>
+              {sessao.verFinanceiro && (
+                <Link
+                  href="/painel/creditos"
+                  onClick={() => setAberto(false)}
+                  className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] text-ink-600 hover:bg-ink-50"
+                >
+                  <Icon name="card" className="size-4 text-ink-400" />
+                  Plano e faturas
+                </Link>
+              )}
+              {/*
+                Sair é um POST via Server Action, não um onClick que limpa
+                estado: a sessão mora no banco e no cookie httpOnly, então
+                encerrar de verdade só acontece no servidor.
+              */}
+              <form action={sairAction}>
+                <button
+                  type="submit"
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink-600 hover:bg-ink-50"
+                >
+                  <Icon name="logout" className="size-4 text-ink-400" />
+                  Sair
+                </button>
+              </form>
             </div>
           </div>
         </>
@@ -381,9 +351,7 @@ export function Pagina({
           <h1 className="text-xl font-semibold tracking-tight text-ink-900 lg:text-2xl">
             {titulo}
           </h1>
-          {descricao && (
-            <p className="mt-1 text-sm text-ink-500">{descricao}</p>
-          )}
+          {descricao && <p className="mt-1 text-sm text-ink-500">{descricao}</p>}
         </div>
         {acao}
       </div>
@@ -392,11 +360,15 @@ export function Pagina({
   );
 }
 
-/* ------------------------------------------------------------- Paywall */
+/* ------------------------------------------------------------------ Paywall */
 
+/**
+ * Tela de módulo bloqueado. Quem decide se está bloqueado é a página no
+ * servidor, comparando `plano.features` — o client nunca recebe dado do módulo
+ * trancado, só este convite. Aqui embaixo é só a vitrine.
+ */
 export function Bloqueado({ feature }: { feature: FeatureKey }) {
-  const app = useApp();
-  const necessario = PLANOS.find((p) => p.features.includes(feature))!;
+  const necessario = planoMinimoPara(feature);
   const nomes: Record<FeatureKey, string> = {
     atendimento: "Atendimento com IA",
     cobranca: "Cobrança automática",
@@ -439,7 +411,10 @@ export function Bloqueado({ feature }: { feature: FeatureKey }) {
         </div>
         <ul className="mt-4 space-y-1.5">
           {necessario.beneficios.slice(0, 4).map((b) => (
-            <li key={b} className="flex items-start gap-2 text-[13px] text-ink-600">
+            <li
+              key={b}
+              className="flex items-start gap-2 text-[13px] text-ink-600"
+            >
               <Icon
                 name="check"
                 className="mt-0.5 size-3.5 shrink-0 text-brand-600"
@@ -450,16 +425,11 @@ export function Bloqueado({ feature }: { feature: FeatureKey }) {
         </ul>
       </div>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-        <Botao
-          tamanho="lg"
-          onClick={() => {
-            app.assinar(necessario.id, app.conta.periodo);
-            app.notificar(`Plano ${necessario.nome} ativado.`);
-          }}
-          iconeDireita="arrowRight"
-        >
-          Fazer upgrade agora
-        </Botao>
+        <Link href={`/painel/creditos?plano=${necessario.id}`}>
+          <Botao tamanho="lg" iconeDireita="arrowRight">
+            Fazer upgrade agora
+          </Botao>
+        </Link>
         <Link href="/painel/creditos">
           <Botao variante="secundario" tamanho="lg">
             Comparar planos
@@ -467,7 +437,7 @@ export function Bloqueado({ feature }: { feature: FeatureKey }) {
         </Link>
       </div>
       <p className="mt-3 text-xs text-ink-400">
-        No protótipo o upgrade é instantâneo e sem cobrança.
+        Você só paga a diferença proporcional ao que falta do ciclo atual.
       </p>
     </div>
   );

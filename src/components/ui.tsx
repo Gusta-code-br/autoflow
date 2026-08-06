@@ -6,11 +6,8 @@ import {
   type ComponentPropsWithRef,
   type ReactNode,
 } from "react";
+import { cx } from "@/lib/cx";
 import { Icon, type IconName } from "./icons";
-
-export function cx(...c: (string | false | null | undefined)[]) {
-  return c.filter(Boolean).join(" ");
-}
 
 /* ---------------------------------------------------------------- Button */
 

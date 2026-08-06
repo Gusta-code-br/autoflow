@@ -1,28 +1,22 @@
-"use client";
-
-import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Botao, Campo, Input } from "@/components/ui";
+import { redirect } from "next/navigation";
+
 import { Icon, Logo } from "@/components/icons";
-import { useApp } from "@/lib/store";
+import { getContexto } from "@/server/dal/contexto";
+import { FormEntrar } from "./form";
 
-export default function EntrarPage() {
-  const app = useApp();
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
+export const metadata = { title: "Entrar · AutoFlow" };
 
-  function aoEnviar(e: FormEvent) {
-    e.preventDefault();
-    app.entrar();
-    router.push("/painel");
-  }
+export default async function EntrarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ destino?: string }>;
+}) {
+  const { destino } = await searchParams;
 
-  function entrarDemo() {
-    app.carregarDemo();
-    router.push("/painel");
-  }
+  // Quem já tem sessão válida não vê tela de login: cai direto no painel.
+  const ctx = await getContexto();
+  if (ctx) redirect(ctx.onboardingCompleto ? "/painel" : "/onboarding");
 
   return (
     <div className="flex min-h-screen">
@@ -43,53 +37,14 @@ export default function EntrarPage() {
             Acesse o painel e continue de onde parou.
           </p>
 
-          <form onSubmit={aoEnviar} className="mt-8 space-y-4">
-            <Campo label="E-mail" obrigatorio>
-              <Input
-                type="email"
-                placeholder="voce@empresa.com.br"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-              />
-            </Campo>
-            <Campo label="Senha" obrigatorio>
-              <Input
-                type="password"
-                placeholder="Sua senha"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                autoComplete="current-password"
-              />
-            </Campo>
-
-            <Botao type="submit" variante="primario" tamanho="lg" className="w-full">
-              Entrar
-            </Botao>
-          </form>
-
-          <div className="my-6 flex items-center gap-3">
-            <span className="h-px flex-1 bg-ink-200" />
-            <span className="text-[12px] text-ink-400">ou</span>
-            <span className="h-px flex-1 bg-ink-200" />
-          </div>
-
-          <Botao
-            variante="zap"
-            tamanho="lg"
-            icone="spark"
-            className="w-full"
-            onClick={entrarDemo}
-          >
-            Entrar na conta de demonstração
-          </Botao>
-          <p className="mt-2 text-center text-[12px] text-ink-400">
-            Explore o painel completo já preenchido com dados de exemplo.
-          </p>
+          <FormEntrar destino={destino ?? "/painel"} />
 
           <p className="mt-8 text-center text-[13.5px] text-ink-500">
             Ainda não tem conta?{" "}
-            <Link href="/cadastro" className="font-medium text-brand-700 hover:underline">
+            <Link
+              href="/cadastro"
+              className="font-medium text-brand-700 hover:underline"
+            >
               Criar conta
             </Link>
           </p>
@@ -114,8 +69,8 @@ export default function EntrarPage() {
 
         <div className="relative">
           <blockquote className="text-2xl font-medium leading-snug text-white">
-            &ldquo;Parei de perder cliente por demora no WhatsApp. A IA
-            responde na hora e ainda cobra quem está atrasado.&rdquo;
+            &ldquo;Parei de perder cliente por demora no WhatsApp. A IA responde
+            na hora e ainda cobra quem está atrasado.&rdquo;
           </blockquote>
           <p className="mt-4 text-[14px] text-brand-100">
             Fernanda Reis · Clínica Vitalis

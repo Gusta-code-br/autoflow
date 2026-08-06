@@ -1,343 +1,312 @@
-"use client";
+import Link from "next/link";
 
-import { useState } from "react";
+import { Icon, type IconName } from "@/components/icons";
 import { Pagina } from "@/components/shell";
-import {
-  Badge,
-  Barra,
-  Botao,
-  Card,
-  CardTitulo,
-  Modal,
-  Switch,
-  cx,
-} from "@/components/ui";
-import { Icon } from "@/components/icons";
-import { useApp } from "@/lib/store";
-import {
-  PACOTES_CREDITO,
-  PERIODOS,
-  PLANOS,
-  economiaCom,
-  getPeriodo,
-  getPlano,
-  precoMensalCom,
-  precoTotalCom,
-} from "@/lib/plans";
-import { brl, dataLonga, diasAte, numero } from "@/lib/format";
-import type { PeriodoId, PlanId, Transacao } from "@/lib/types";
+import { Badge, Barra, Card, CardTitulo, Vazio } from "@/components/ui";
+import { cx } from "@/lib/cx";
+import { brl, dataLonga, numero } from "@/lib/format";
+import { painelCreditos, type FaturaDTO } from "@/server/dal/creditos";
+import { carregarSessaoPainel } from "@/server/dal/painel";
+import { centavosParaReais } from "@/server/dominio/dinheiro";
+import { BotaoMudarPlano, PacotesRecarga, SwitchRenovacao } from "./interacoes";
 
-export default function CreditosPage() {
+/**
+ * Plano, créditos e faturas.
+ *
+ * Server Component: assinatura, consumo e histórico saem do banco com RLS
+ * ligado. O protótipo lia `app.conta` do localStorage e as constantes de
+ * `lib/plans`, então mostrava um plano Profissional para todo mundo e
+ * "creditava" mensagens no clique — aqui o catálogo vem das tabelas `plano`,
+ * `plano_preco` e `pacote_credito`, e crédito só entra por webhook pago.
+ */
+export default async function CreditosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ plano?: string | string[] }>;
+}) {
+  const sessao = await carregarSessaoPainel();
+
+  /*
+   * Atendente não vê dinheiro. A DAL recusaria de qualquer jeito
+   * (`SemPermissaoError`), mas deixar estourar viraria tela de erro genérica em
+   * vez de explicação.
+   */
+  if (!sessao.verFinanceiro) {
+    return (
+      <Pagina titulo="Plano e créditos">
+        <Card>
+          <Vazio
+            icone="lock"
+            titulo="Somente administradores"
+            descricao="Plano, faturas e recarga de créditos ficam com quem administra a conta. Peça a quem te convidou se precisar de mais mensagens."
+          />
+        </Card>
+      </Pagina>
+    );
+  }
+
+  const { plano: planoQuery } = await searchParams;
+  const planoSugerido =
+    typeof planoQuery === "string" ? planoQuery : (planoQuery?.[0] ?? null);
+
+  const { assinatura, consumo, faturas, catalogo, precoConexaoExtra, pacotes } =
+    await painelCreditos();
+
+  const planoAtual = catalogo.find((p) => p.id === assinatura.planoId) ?? null;
+
   return (
     <Pagina
       titulo="Plano e créditos"
       descricao="Sua assinatura, o consumo de mensagens de IA e o histórico de pagamentos."
     >
       <div className="space-y-6">
-        <BlocoPlano />
-        <BlocoCreditos />
-        <BlocoFaturas />
+        <Card>
+          <CardTitulo
+            titulo="Seu plano"
+            subtitulo="O que está incluso na sua assinatura"
+            acao={
+              <BotaoMudarPlano
+                catalogo={catalogo}
+                planoAtualId={assinatura.planoId}
+                periodicidadeAtual={assinatura.periodicidade}
+                planoSugerido={planoSugerido}
+                rotulo={planoAtual ? "Mudar de plano" : "Escolher plano"}
+                variante={planoAtual ? "secundario" : "primario"}
+              />
+            }
+          />
+
+          {!planoAtual ? (
+            <Vazio
+              icone="spark"
+              titulo="Nenhum plano ativo"
+              descricao="Escolha um plano para a IA continuar atendendo, cobrando e agendando pelo seu WhatsApp."
+            />
+          ) : (
+            <>
+              <div className="grid gap-6 p-5 md:grid-cols-[1.1fr_1fr]">
+                <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-white p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium tracking-wide text-brand-600 uppercase">
+                        Plano atual
+                      </p>
+                      <p className="mt-1 text-xl font-semibold text-ink-900">
+                        {assinatura.planoNome}
+                        <span className="ml-2 text-sm font-normal text-ink-500">
+                          · {NOME_PERIODO[assinatura.periodicidade ?? ""] ?? "—"}
+                        </span>
+                      </p>
+                    </div>
+                    <StatusAssinatura status={assinatura.status} />
+                  </div>
+
+                  {/*
+                   * Preço contratado, não o de tabela: quem assinou antes de um
+                   * reajuste continua pagando o que combinou, e ver outro
+                   * número aqui pareceria cobrança escondida.
+                   */}
+                  <p className="mt-3 text-2xl font-semibold text-ink-900">
+                    {brl(
+                      centavosParaReais(
+                        assinatura.precoContratado /
+                          MESES[assinatura.periodicidade ?? "mensal"],
+                      ),
+                    )}
+                    <span className="text-sm font-normal text-ink-500">/mês</span>
+                  </p>
+                  <p className="mt-1 text-[13px] text-ink-500">
+                    {brl(centavosParaReais(assinatura.precoContratado))} cobrado a
+                    cada {MESES[assinatura.periodicidade ?? "mensal"]}{" "}
+                    {MESES[assinatura.periodicidade ?? "mensal"] === 1
+                      ? "mês"
+                      : "meses"}
+                  </p>
+
+                  {assinatura.expiraEm && (
+                    <p className="mt-3 text-[13px] text-ink-600">
+                      {assinatura.status === "trial" ? "Teste até" : "Renova em"}{" "}
+                      <strong className="font-medium">
+                        {dataLonga(assinatura.expiraEm.toISOString())}
+                      </strong>
+                      {assinatura.diasParaExpirar !== null &&
+                        (assinatura.diasParaExpirar >= 0
+                          ? ` — faltam ${assinatura.diasParaExpirar} ${
+                              assinatura.diasParaExpirar === 1 ? "dia" : "dias"
+                            }`
+                          : " — vencido")}
+                    </p>
+                  )}
+
+                  {assinatura.conexoesExtras > 0 && (
+                    <p className="mt-1 text-[13px] text-ink-500">
+                      + {assinatura.conexoesExtras}{" "}
+                      {assinatura.conexoesExtras === 1
+                        ? "número extra"
+                        : "números extras"}{" "}
+                      ({brl(centavosParaReais(precoConexaoExtra))} cada por mês)
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="mb-2 text-[13px] font-medium text-ink-700">
+                    O que está incluso
+                  </p>
+                  <ul className="space-y-1.5">
+                    {planoAtual.beneficios.map((b) => (
+                      <li
+                        key={b}
+                        className="flex items-start gap-2 text-[13px] text-ink-600"
+                      >
+                        <Icon
+                          name="check"
+                          className="mt-0.5 size-3.5 shrink-0 text-brand-600"
+                        />
+                        {b}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="px-5 pb-5">
+                <SwitchRenovacao ativa={assinatura.renovacaoAutomatica} />
+              </div>
+            </>
+          )}
+        </Card>
+
+        <Card>
+          <CardTitulo
+            titulo="Créditos de IA"
+            subtitulo="Cada resposta da IA consome 1 crédito; sua cota renova todo mês e você pode recarregar quando quiser."
+          />
+          <div className="space-y-6 p-5">
+            <div>
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="font-medium text-ink-800">
+                  {numero(consumo.restantes)} restantes
+                </span>
+                <span className="text-ink-500">
+                  {consumo.percentual}% usado este mês
+                </span>
+              </div>
+              <Barra
+                valor={consumo.percentual}
+                tom={
+                  consumo.percentual > 90
+                    ? "perigo"
+                    : consumo.percentual > 70
+                      ? "aviso"
+                      : "marca"
+                }
+                className="mt-2"
+              />
+
+              {consumo.usados > 0 && (
+                <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+                  <QuebraModulo
+                    nome="Atendimento"
+                    valor={consumo.porFeature.atendimento}
+                    total={consumo.usados}
+                    cor="bg-brand-500"
+                  />
+                  <QuebraModulo
+                    nome="Cobrança"
+                    valor={consumo.porFeature.cobranca}
+                    total={consumo.usados}
+                    cor="bg-amber-400"
+                  />
+                  <QuebraModulo
+                    nome="Agendamento"
+                    valor={consumo.porFeature.agendamento}
+                    total={consumo.usados}
+                    cor="bg-sky-400"
+                  />
+                </div>
+              )}
+
+              {/*
+               * Projeção com o ritmo real do ciclo. Sem isso o cliente só
+               * descobre que acabou quando a IA para de responder.
+               */}
+              {consumo.diasRestantes !== null && (
+                <p
+                  className={cx(
+                    "mt-3 text-[13px]",
+                    consumo.diasRestantes <= 5 ? "text-amber-700" : "text-ink-500",
+                  )}
+                >
+                  No ritmo de {numero(Math.round(consumo.mediaDiaria))} mensagens
+                  por dia, o saldo dura mais{" "}
+                  <strong className="font-medium">
+                    {consumo.diasRestantes}{" "}
+                    {consumo.diasRestantes === 1 ? "dia" : "dias"}
+                  </strong>
+                  .
+                </p>
+              )}
+            </div>
+
+            <PacotesRecarga pacotes={pacotes} />
+          </div>
+        </Card>
+
+        <Card>
+          <CardTitulo
+            titulo="Faturas"
+            subtitulo="Histórico de pagamentos da sua conta"
+          />
+          {faturas.length === 0 ? (
+            <Vazio
+              icone="cash"
+              titulo="Nenhuma fatura ainda"
+              descricao="Assim que você contratar um plano ou comprar créditos, os pagamentos aparecem aqui."
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-ink-100 text-xs text-ink-400">
+                    <th className="px-5 py-3 font-medium">Descrição</th>
+                    <th className="px-5 py-3 font-medium">Tipo</th>
+                    <th className="px-5 py-3 font-medium">Data</th>
+                    <th className="px-5 py-3 font-medium">Método</th>
+                    <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="px-5 py-3 text-right font-medium">Valor</th>
+                    <th className="px-5 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {faturas.map((f) => (
+                    <LinhaFatura key={f.id} fatura={f} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
       </div>
     </Pagina>
   );
 }
 
-/* --------------------------------------------------------------- Plano */
+/* ---------------------------------------------------------------- Peças */
 
-function BlocoPlano() {
-  const app = useApp();
-  const [modalAberto, setModalAberto] = useState(false);
-  const plano = getPlano(app.conta.planoId);
-  const periodo = getPeriodo(app.conta.periodo);
-  const diasParaExpirar = diasAte(app.conta.expiraEm);
+const MESES: Record<string, number> = { mensal: 1, semestral: 6, anual: 12 };
 
-  return (
-    <Card>
-      <CardTitulo
-        titulo="Seu plano"
-        subtitulo="O que está incluso na sua assinatura"
-        acao={
-          <Botao variante="secundario" tamanho="sm" onClick={() => setModalAberto(true)}>
-            Mudar de plano
-          </Botao>
-        }
-      />
-      <div className="grid gap-6 p-5 md:grid-cols-[1.1fr_1fr]">
-        <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-white p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-brand-600">
-                Plano atual
-              </p>
-              <p className="mt-1 text-xl font-semibold text-ink-900">
-                {plano.nome}
-                <span className="ml-2 text-sm font-normal text-ink-500">
-                  · {periodo.nome}
-                </span>
-              </p>
-            </div>
-            {plano.destaque && <Badge tom="marca">Mais popular</Badge>}
-          </div>
-          <p className="mt-3 text-2xl font-semibold text-ink-900">
-            {brl(precoMensalCom(plano.id, periodo.id))}
-            <span className="text-sm font-normal text-ink-500">/mês</span>
-          </p>
-          <p className="mt-1 text-[13px] text-ink-500">
-            {brl(precoTotalCom(plano.id, periodo.id))} cobrado a cada {periodo.meses}{" "}
-            {periodo.meses === 1 ? "mês" : "meses"}
-          </p>
-          <p className="mt-3 text-[13px] text-ink-600">
-            Expira em <strong className="font-medium">{dataLonga(app.conta.expiraEm)}</strong>
-            {diasParaExpirar >= 0 && ` — faltam ${diasParaExpirar} dias`}
-          </p>
-        </div>
-        <div>
-          <p className="mb-2 text-[13px] font-medium text-ink-700">O que está incluso</p>
-          <ul className="space-y-1.5">
-            {plano.beneficios.map((b) => (
-              <li key={b} className="flex items-start gap-2 text-[13px] text-ink-600">
-                <Icon name="check" className="mt-0.5 size-3.5 shrink-0 text-brand-600" />
-                {b}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
+const NOME_PERIODO: Record<string, string> = {
+  mensal: "Mensal",
+  semestral: "Semestral",
+  anual: "Anual",
+};
 
-      <ModalMudarPlano aberto={modalAberto} aoFechar={() => setModalAberto(false)} />
-    </Card>
-  );
-}
-
-function ModalMudarPlano({ aberto, aoFechar }: { aberto: boolean; aoFechar: () => void }) {
-  const app = useApp();
-  const [planoSel, setPlanoSel] = useState<PlanId>(app.conta.planoId);
-  const [periodoSel, setPeriodoSel] = useState<PeriodoId>(app.conta.periodo);
-
-  const mensal = precoMensalCom(planoSel, periodoSel);
-  const total = precoTotalCom(planoSel, periodoSel);
-  const economia = economiaCom(planoSel, periodoSel);
-
-  function confirmar() {
-    app.assinar(planoSel, periodoSel);
-    app.notificar(`Plano ${getPlano(planoSel).nome} ativado com sucesso.`);
-    aoFechar();
-  }
-
-  return (
-    <Modal
-      aberto={aberto}
-      aoFechar={aoFechar}
-      titulo="Mudar de plano"
-      subtitulo="Escolha o plano e o período de cobrança"
-      largura="max-w-2xl"
-      rodape={
-        <>
-          <Botao variante="fantasma" onClick={aoFechar}>
-            Cancelar
-          </Botao>
-          <Botao onClick={confirmar} icone="check">
-            Confirmar {getPlano(planoSel).nome} — {brl(total)}
-          </Botao>
-        </>
-      }
-    >
-      <div className="mb-5 flex gap-1 rounded-xl bg-ink-100 p-1">
-        {PERIODOS.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setPeriodoSel(p.id)}
-            className={cx(
-              "relative flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all",
-              periodoSel === p.id ? "bg-white text-ink-900 shadow-sm" : "text-ink-500 hover:text-ink-800",
-            )}
-          >
-            {p.nome}
-            {p.selo && (
-              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                {p.selo}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        {PLANOS.map((p) => {
-          const ativo = planoSel === p.id;
-          return (
-            <button
-              key={p.id}
-              onClick={() => setPlanoSel(p.id)}
-              className={cx(
-                "flex flex-col items-start rounded-2xl border p-4 text-left transition-all",
-                ativo
-                  ? "border-brand-500 bg-brand-50/60 ring-2 ring-brand-500/20"
-                  : "border-ink-200 hover:border-ink-300",
-              )}
-            >
-              <div className="flex w-full items-center justify-between">
-                <span className="text-sm font-semibold text-ink-900">{p.nome}</span>
-                {p.destaque && <Badge tom="marca">Popular</Badge>}
-              </div>
-              <p className="mt-1 text-lg font-semibold text-ink-900">
-                {brl(precoMensalCom(p.id, periodoSel))}
-                <span className="text-xs font-normal text-ink-500">/mês</span>
-              </p>
-              <p className="mt-1 text-xs text-ink-500">
-                {numero(p.creditosMes)} mensagens/mês
-              </p>
-              <p className="mt-2 text-xs leading-relaxed text-ink-500">{p.chamada}</p>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-4 rounded-xl bg-ink-50 p-4 text-[13px]">
-        <div className="flex items-center justify-between">
-          <span className="text-ink-500">Equivalente mensal</span>
-          <span className="font-semibold text-ink-900">{brl(mensal)}/mês</span>
-        </div>
-        <div className="mt-1 flex items-center justify-between">
-          <span className="text-ink-500">Total do período</span>
-          <span className="font-semibold text-ink-900">{brl(total)}</span>
-        </div>
-        {economia > 0 && (
-          <div className="mt-1 flex items-center justify-between text-emerald-700">
-            <span>Você economiza</span>
-            <span className="font-semibold">{brl(economia)}</span>
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
-/* ----------------------------------------------------------- Créditos */
-
-function BlocoCreditos() {
-  const app = useApp();
-  const [recargaAuto, setRecargaAuto] = useState(false);
-
-  const consumoAtendimento = app.uso.reduce((s, u) => s + u.atendimento, 0);
-  const consumoCobranca = app.uso.reduce((s, u) => s + u.cobranca, 0);
-  const consumoAgendamento = app.uso.reduce((s, u) => s + u.agendamento, 0);
-  const consumoTotal = consumoAtendimento + consumoCobranca + consumoAgendamento;
-
-  function comprar(pacoteId: string) {
-    const pacote = PACOTES_CREDITO.find((p) => p.id === pacoteId);
-    app.comprarCreditos(pacoteId);
-    app.notificar(
-      pacote
-        ? `${numero(pacote.creditos)} mensagens adicionadas com sucesso via PIX.`
-        : "Créditos adicionados.",
-    );
-  }
-
-  return (
-    <Card>
-      <CardTitulo
-        titulo="Créditos de IA"
-        subtitulo="Cada resposta da IA consome 1 crédito; sua cota renova todo mês e você pode recarregar quando quiser."
-      />
-      <div className="space-y-6 p-5">
-        <div>
-          <div className="flex items-baseline justify-between text-sm">
-            <span className="font-medium text-ink-800">
-              {numero(app.creditosRestantes)} restantes
-            </span>
-            <span className="text-ink-500">{app.percentualUso}% usado este mês</span>
-          </div>
-          <Barra
-            valor={app.percentualUso}
-            tom={app.percentualUso > 90 ? "perigo" : app.percentualUso > 70 ? "aviso" : "marca"}
-            className="mt-2"
-          />
-
-          {consumoTotal > 0 && (
-            <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-              <QuebraModulo
-                nome="Atendimento"
-                valor={consumoAtendimento}
-                total={consumoTotal}
-                cor="bg-brand-500"
-              />
-              <QuebraModulo
-                nome="Cobrança"
-                valor={consumoCobranca}
-                total={consumoTotal}
-                cor="bg-amber-400"
-              />
-              <QuebraModulo
-                nome="Agendamento"
-                valor={consumoAgendamento}
-                total={consumoTotal}
-                cor="bg-sky-400"
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between rounded-xl border border-ink-200 p-4">
-          <Switch
-            ativo={recargaAuto}
-            onChange={(v) => {
-              setRecargaAuto(v);
-              app.notificar(
-                v
-                  ? "Recarga automática marcada. Disponível na versão final."
-                  : "Recarga automática desmarcada.",
-                "info",
-              );
-            }}
-            label="Recarga automática quando faltar 10%"
-            descricao="A gente compra o menor pacote pra você não ficar sem créditos."
-          />
-        </div>
-
-        <div>
-          <p className="mb-3 text-[13px] font-medium text-ink-700">Pacotes de recarga</p>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {PACOTES_CREDITO.map((pac) => {
-              const precoPorMsg = pac.preco / pac.creditos;
-              return (
-                <div
-                  key={pac.id}
-                  className="flex flex-col rounded-2xl border border-ink-200 p-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-ink-900">
-                      {numero(pac.creditos)} mensagens
-                    </span>
-                    {pac.selo && <Badge tom="marca">{pac.selo}</Badge>}
-                  </div>
-                  <p className="mt-2 text-xl font-semibold text-ink-900">{brl(pac.preco)}</p>
-                  <p className="text-xs text-ink-500">
-                    {precoPorMsg.toLocaleString("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                      minimumFractionDigits: 3,
-                      maximumFractionDigits: 3,
-                    })}{" "}
-                    por mensagem
-                  </p>
-                  <Botao
-                    variante="zap"
-                    tamanho="sm"
-                    icone="pix"
-                    className="mt-3"
-                    onClick={() => comprar(pac.id)}
-                  >
-                    Comprar com PIX
-                  </Botao>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
+function StatusAssinatura({ status }: { status: string | null }) {
+  if (status === "trial") return <Badge tom="info">Teste grátis</Badge>;
+  if (status === "inadimplente") return <Badge tom="perigo">Em atraso</Badge>;
+  if (status === "ativa") return <Badge tom="sucesso">Ativa</Badge>;
+  return null;
 }
 
 function QuebraModulo({
@@ -363,83 +332,91 @@ function QuebraModulo({
   );
 }
 
-/* ------------------------------------------------------------ Faturas */
-
-const TIPO_TOM: Record<Transacao["tipo"], "marca" | "info" | "neutro"> = {
+const TIPO_TOM: Record<string, "marca" | "info" | "neutro"> = {
   assinatura: "marca",
   creditos: "info",
   conexao: "neutro",
 };
 
-const TIPO_NOME: Record<Transacao["tipo"], string> = {
+const TIPO_NOME: Record<string, string> = {
   assinatura: "Assinatura",
   creditos: "Créditos",
   conexao: "Conexão extra",
 };
 
-function BlocoFaturas() {
-  const app = useApp();
+const STATUS_FATURA: Record<string, { tom: "sucesso" | "aviso" | "perigo" | "neutro"; nome: string }> = {
+  aprovado: { tom: "sucesso", nome: "Pago" },
+  pendente: { tom: "aviso", nome: "Aguardando" },
+  recusado: { tom: "perigo", nome: "Recusado" },
+  estornado: { tom: "neutro", nome: "Estornado" },
+  expirado: { tom: "neutro", nome: "Expirado" },
+};
+
+const METODO: Record<string, { icone: IconName; nome: string }> = {
+  pix: { icone: "pix", nome: "PIX" },
+  cartao: { icone: "card", nome: "Cartão" },
+  boleto: { icone: "copy", nome: "Boleto" },
+};
+
+function LinhaFatura({ fatura }: { fatura: FaturaDTO }) {
+  const status = STATUS_FATURA[fatura.status] ?? {
+    tom: "neutro" as const,
+    nome: fatura.status,
+  };
+  const metodo = METODO[fatura.metodo] ?? { icone: "cash" as IconName, nome: fatura.metodo };
+  /* Data do pagamento quando pago; senão a da emissão — nunca uma data vazia. */
+  const quando = fatura.pagoEm ?? fatura.criadoEm;
 
   return (
-    <Card>
-      <CardTitulo titulo="Faturas" subtitulo="Histórico de pagamentos da sua conta" />
-      {app.transacoes.length === 0 ? (
-        <div className="p-5 text-sm text-ink-500">Nenhuma fatura ainda.</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-[13px]">
-            <thead>
-              <tr className="border-b border-ink-100 text-xs text-ink-400">
-                <th className="px-5 py-3 font-medium">Descrição</th>
-                <th className="px-5 py-3 font-medium">Tipo</th>
-                <th className="px-5 py-3 font-medium">Data</th>
-                <th className="px-5 py-3 font-medium">Método</th>
-                <th className="px-5 py-3 font-medium">Status</th>
-                <th className="px-5 py-3 text-right font-medium">Valor</th>
-                <th className="px-5 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {app.transacoes.map((t) => (
-                <tr key={t.id} className="border-b border-ink-50 last:border-0">
-                  <td className="px-5 py-3 text-ink-800">{t.descricao}</td>
-                  <td className="px-5 py-3">
-                    <Badge tom={TIPO_TOM[t.tipo]}>{TIPO_NOME[t.tipo]}</Badge>
-                  </td>
-                  <td className="px-5 py-3 text-ink-500">{dataLonga(t.data)}</td>
-                  <td className="px-5 py-3 text-ink-500">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Icon
-                        name={t.metodo === "pix" ? "pix" : "card"}
-                        className="size-3.5 text-ink-400"
-                      />
-                      {t.metodo === "pix" ? "PIX" : "Cartão"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <Badge tom={t.status === "pago" ? "sucesso" : "aviso"}>
-                      {t.status === "pago" ? "Pago" : "Pendente"}
-                    </Badge>
-                  </td>
-                  <td className="px-5 py-3 text-right font-medium text-ink-900">
-                    {brl(t.valor)}
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <Botao
-                      variante="fantasma"
-                      tamanho="sm"
-                      icone="copy"
-                      onClick={() => app.notificar("Recibo enviado para o seu e-mail.", "info")}
-                    >
-                      Baixar recibo
-                    </Botao>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
+    <tr className="border-b border-ink-50 last:border-0">
+      <td className="px-5 py-3 text-ink-800">{fatura.descricao}</td>
+      <td className="px-5 py-3">
+        <Badge tom={TIPO_TOM[fatura.tipo] ?? "neutro"}>
+          {TIPO_NOME[fatura.tipo] ?? fatura.tipo}
+        </Badge>
+      </td>
+      <td className="px-5 py-3 text-ink-500">{dataLonga(quando.toISOString())}</td>
+      <td className="px-5 py-3 text-ink-500">
+        <span className="inline-flex items-center gap-1.5">
+          <Icon name={metodo.icone} className="size-3.5 text-ink-400" />
+          {metodo.nome}
+        </span>
+      </td>
+      <td className="px-5 py-3">
+        <Badge tom={status.tom}>{status.nome}</Badge>
+      </td>
+      <td className="px-5 py-3 text-right font-medium text-ink-900">
+        {brl(centavosParaReais(fatura.valor), true)}
+      </td>
+      <td className="px-5 py-3 text-right">
+        {/*
+         * Pendente vai para o checkout interno (que mostra o PIX e fica olhando
+         * o status); pago vai para o comprovante do provedor. O protótipo tinha
+         * um "Baixar recibo" que só mostrava um toast — botão que não faz nada
+         * é pior que botão nenhum.
+         */}
+        {fatura.status === "pendente" ? (
+          <Link
+            href={`/painel/checkout/${fatura.id}`}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] font-medium text-brand-700 transition-colors hover:bg-brand-50"
+          >
+            Pagar
+            <Icon name="arrowRight" className="size-3.5" />
+          </Link>
+        ) : fatura.ticketUrl ? (
+          <a
+            href={fatura.ticketUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] font-medium text-brand-700 transition-colors hover:bg-brand-50"
+          >
+            Comprovante
+            <Icon name="arrowRight" className="size-3.5" />
+          </a>
+        ) : (
+          <span className="text-xs text-ink-300">—</span>
+        )}
+      </td>
+    </tr>
   );
 }

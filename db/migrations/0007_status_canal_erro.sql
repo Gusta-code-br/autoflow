@@ -1,0 +1,16 @@
+-- 0007 — Status 'erro' para canal de WhatsApp
+--
+-- `verificarCredencial` já marca o canal como 'erro' quando o provedor recusa a
+-- credencial (token revogado, instância derrubada), e o painel conta canais
+-- nesse estado para avisar o dono. O enum tinha só 'pendente'/'conectado'/
+-- 'desconectado'/'banido', então toda leitura de conexões estourava 22P02.
+--
+-- 'erro' é diferente de 'desconectado': desconectado é decisão do usuário
+-- (ele clicou em desconectar e o token foi apagado); erro é o provedor
+-- recusando uma credencial que ainda está guardada — dá para tentar de novo
+-- sem reconectar do zero.
+--
+-- ALTER TYPE ... ADD VALUE roda dentro de transação no Postgres 12+, desde que
+-- o valor novo não seja usado na mesma transação. Por isso este arquivo só
+-- declara o valor; quem lê/escreve é o código.
+ALTER TYPE status_canal ADD VALUE IF NOT EXISTS 'erro' AFTER 'desconectado';
