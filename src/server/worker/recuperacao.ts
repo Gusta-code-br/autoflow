@@ -6,6 +6,7 @@ import {
   type CanalResolvido,
 } from "../webhooks/entrada";
 import { processarWebhookEvolution } from "../webhooks/evolution";
+import { processarWebhookMercadoPago } from "../webhooks/mercadopago";
 import { processarWebhookMeta } from "../webhooks/meta";
 
 /**
@@ -73,6 +74,12 @@ function canalDoEvento(ev: EventoPendente): CanalResolvido | null {
   return { canalId, orgId: ev.org_id };
 }
 
+/** A rota grava `{ dataId, ... }` — é o id do pagamento no Mercado Pago. */
+function dataIdDoEvento(ev: EventoPendente): string | null {
+  const p = ev.payload as { dataId?: unknown } | null;
+  return typeof p?.dataId === "string" ? p.dataId : null;
+}
+
 export async function reprocessarEventos(limite = 20): Promise<ResumoRecuperacao> {
   const pendentes = await reservarEventos(limite);
   const res: ResumoRecuperacao = {
@@ -95,6 +102,16 @@ export async function reprocessarEventos(limite = 20): Promise<ResumoRecuperacao
           continue;
         }
         await processarWebhookEvolution(canal, ev.payload);
+      } else if (ev.provedor === "mercadopago") {
+        const dataId = dataIdDoEvento(ev);
+        if (!dataId) {
+          // Payload salvo sem `data.id` não deveria acontecer (a rota exige
+          // antes de gravar), mas se acontecer não há o que reprocessar.
+          await marcarEventoProcessado(ev.provedor, ev.evento_id, "data_id_ausente");
+          res.falhas++;
+          continue;
+        }
+        await processarWebhookMercadoPago(dataId);
       } else {
         await marcarEventoProcessado(ev.provedor, ev.evento_id, "provedor_desconhecido");
         res.falhas++;

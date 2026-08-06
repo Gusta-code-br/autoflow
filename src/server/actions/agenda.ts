@@ -35,6 +35,14 @@ const STATUS_VALIDOS: AgendamentoDTO["status"][] = [
   "faltou",
 ];
 
+const MENSAGEM_STATUS: Record<AgendamentoDTO["status"], string> = {
+  pendente: "Reaberto.",
+  confirmado: "Confirmado.",
+  concluido: "Marcado como concluído.",
+  cancelado: "Cancelado.",
+  faltou: "Marcado como falta.",
+};
+
 export async function criarAgendamentoAction(
   _anterior: EstadoForm,
   form: FormData,
@@ -70,7 +78,7 @@ export async function mudarStatusAction(
     }
     await mudarStatusAgendamento(texto(form, "id"), status);
     refresh();
-    return { ok: true };
+    return { ok: true, mensagem: MENSAGEM_STATUS[status] };
   } catch (e) {
     return paraEstado(e);
   }

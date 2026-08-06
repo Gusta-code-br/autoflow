@@ -572,11 +572,12 @@ export async function contratarPlano(
 
     const [pagamento] = await tx<{ id: string; expira_em: Date | null }[]>`
       INSERT INTO pagamento (org_id, tipo, descricao, valor, metodo, status,
-                             assinatura_id, expira_em)
+                             assinatura_id, plano_id, periodicidade, expira_em)
       VALUES (${ctx.orgId}, 'assinatura',
               ${`Plano ${preco.plano_nome} — ${periodicidade}`},
               ${preco.preco_total}, 'pix', 'pendente',
-              ${assinatura?.id ?? null}, now() + interval '30 minutes')
+              ${assinatura?.id ?? null}, ${planoId}, ${periodicidade}::periodicidade,
+              now() + interval '30 minutes')
       RETURNING id, expira_em
     `;
 

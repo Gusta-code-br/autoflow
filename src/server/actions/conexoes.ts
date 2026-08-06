@@ -5,6 +5,7 @@ import { refresh } from "next/cache";
 import type { EstadoForm } from "@/lib/form";
 import {
   conectarCanal,
+  conectarCanalEmbedded,
   CredencialInvalidaError,
   definirPrincipal,
   desconectarCanal,
@@ -104,6 +105,50 @@ export async function conectarCanalAction(
         campos: campo ? { [campo]: e.message } : undefined,
         valores,
       };
+    }
+
+    return paraEstado(e, valores);
+  }
+}
+
+/**
+ * Recebe o `code` que o pop-up de Login com Facebook devolveu no navegador
+ * (via `window.FB.login`, disparado por um Client Component — Server Action
+ * não abre pop-up) e faz o resto no servidor: troca por token, assina
+ * webhook, registra o número.
+ */
+export async function conectarCanalEmbeddedAction(
+  _anterior: EstadoForm,
+  form: FormData,
+): Promise<EstadoForm> {
+  const valores: Record<string, string> = {
+    nome: texto(form, "nome"),
+  };
+
+  try {
+    const criado = await conectarCanalEmbedded({
+      nome: texto(form, "nome"),
+      code: texto(form, "code"),
+      wabaId: texto(form, "wabaId"),
+      phoneNumberId: texto(form, "phoneNumberId"),
+    });
+    refresh();
+
+    return {
+      ok: true,
+      mensagem: criado.aviso ?? `Número ${criado.numero} conectado.`,
+    };
+  } catch (e) {
+    if (e instanceof LimiteConexoesError) {
+      return {
+        ok: false,
+        erro: `${e.message} Desconecte um número ou compre uma conexão extra.`,
+        valores,
+      };
+    }
+
+    if (e instanceof CredencialInvalidaError) {
+      return { ok: false, erro: e.message, valores };
     }
 
     return paraEstado(e, valores);

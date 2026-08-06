@@ -1,14 +1,17 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 
 import { AvisoForm, BotaoEnviar, erroDe, valorDe } from "@/components/form";
 import { Icon } from "@/components/icons";
+import { useToastEstado } from "@/components/toast";
 import { Botao, Campo, Input, Modal, Select } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { ESTADO_INICIAL, type EstadoForm } from "@/lib/form";
 import {
   conectarCanalAction,
+  conectarCanalEmbeddedAction,
   definirPrincipalAction,
   desconectarCanalAction,
   renomearCanalAction,
@@ -70,7 +73,23 @@ function ModalConectar({
   noLimite: boolean;
 }) {
   const [estado, acao] = useActionState(conectarCanalAction, ESTADO_INICIAL);
+  const [estadoEmbedded, acaoEmbedded] = useActionState(
+    conectarCanalEmbeddedAction,
+    ESTADO_INICIAL,
+  );
   const [provedor, setProvedor] = useState("meta_cloud");
+
+  // As duas variáveis só chegam ao bundle do navegador se alguém configurou
+  // o Embedded Signup no App da Meta. Sem elas o botão de um clique some
+  // sozinho e sobra só o formulário manual — nenhuma conta fica sem forma
+  // de conectar.
+  const appId = process.env.NEXT_PUBLIC_META_APP_ID;
+  const configId = process.env.NEXT_PUBLIC_META_CONFIG_ID;
+  const embeddedDisponivel = Boolean(appId && configId);
+  const [modoManual, setModoManual] = useState(false);
+  const usarEmbedded = embeddedDisponivel && !modoManual;
+  const estadoAtivo = usarEmbedded ? estadoEmbedded : estado;
+  useToastEstado(estadoAtivo);
 
   return (
     <Modal
@@ -80,7 +99,7 @@ function ModalConectar({
       subtitulo="Ligamos ao seu número pela API oficial da Meta ou por uma Evolution API que você já tenha."
       largura="max-w-xl"
     >
-      {estado.ok ? (
+      {estadoAtivo.ok ? (
         /*
          * Sucesso fica na tela até o usuário fechar: quando é Evolution, a
          * mensagem traz a URL de webhook que ele precisa colar do outro lado.
@@ -90,7 +109,7 @@ function ModalConectar({
           <div className="flex items-start gap-3 rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-200 ring-inset">
             <Icon name="check" className="mt-0.5 size-4 shrink-0 text-emerald-600" />
             <p className="text-[13px] leading-relaxed break-words text-emerald-800">
-              {estado.mensagem}
+              {estadoAtivo.mensagem}
             </p>
           </div>
           <div className="flex justify-end">
@@ -98,14 +117,69 @@ function ModalConectar({
           </div>
         </div>
       ) : (
-        <form action={acao} className="space-y-4">
-          <AvisoForm estado={estado} />
-
+        <div className="space-y-4">
           {noLimite && (
             <p className="rounded-xl bg-amber-50 px-4 py-3 text-[13px] leading-relaxed text-amber-800 ring-1 ring-amber-200 ring-inset">
               Você já usou os números inclusos no seu plano. Este número entra
               como conexão extra: {precoExtra}/mês na próxima fatura.
             </p>
+          )}
+
+          {usarEmbedded ? (
+            <FormularioEmbedded
+              appId={appId!}
+              configId={configId!}
+              estado={estadoEmbedded}
+              acao={acaoEmbedded}
+              aoFechar={aoFechar}
+              aoUsarManual={() => setModoManual(true)}
+            />
+          ) : (
+            <FormularioManual
+              acao={acao}
+              estado={estado}
+              provedor={provedor}
+              setProvedor={setProvedor}
+              embeddedDisponivel={embeddedDisponivel}
+              aoUsarEmbedded={() => setModoManual(false)}
+              aoFechar={aoFechar}
+            />
+          )}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function FormularioManual({
+  acao,
+  estado,
+  provedor,
+  setProvedor,
+  embeddedDisponivel,
+  aoUsarEmbedded,
+  aoFechar,
+}: {
+  acao: (payload: FormData) => void;
+  estado: EstadoForm;
+  provedor: string;
+  setProvedor: (valor: string) => void;
+  embeddedDisponivel: boolean;
+  aoUsarEmbedded: () => void;
+  aoFechar: () => void;
+}) {
+  return (
+        <form action={acao} className="space-y-4">
+          <AvisoForm estado={estado} />
+
+          {embeddedDisponivel && (
+            <button
+              type="button"
+              onClick={aoUsarEmbedded}
+              className="text-[13px] font-medium text-brand-700 hover:underline"
+            >
+              ← Prefiro logar com a Meta em vez de colar os dados
+            </button>
           )}
 
           <Campo label="Como conectar" obrigatorio>
@@ -247,8 +321,269 @@ function ModalConectar({
             </BotaoEnviar>
           </div>
         </form>
+  );
+}
+
+/* ---------------------------------------- Conectar via Embedded Signup */
+
+declare global {
+  interface Window {
+    FB?: {
+      init: (parametros: Record<string, unknown>) => void;
+      login: (
+        retorno: (resposta: { authResponse?: { code?: string } }) => void,
+        parametros: Record<string, unknown>,
+      ) => void;
+    };
+    fbAsyncInit?: () => void;
+  }
+}
+
+const VERSAO_SDK_FACEBOOK = "v21.0";
+
+/** Injeta o SDK JS da Meta uma única vez por página e resolve quando ele avisar que carregou. */
+function carregarSdkFacebook(appId: string): Promise<void> {
+  return new Promise((resolve, rejeitar) => {
+    if (window.FB) {
+      resolve();
+      return;
+    }
+
+    const anterior = window.fbAsyncInit;
+    window.fbAsyncInit = () => {
+      anterior?.();
+      window.FB?.init({ appId, version: VERSAO_SDK_FACEBOOK, xfbml: false });
+      resolve();
+    };
+
+    if (document.getElementById("facebook-jssdk")) return;
+
+    const script = document.createElement("script");
+    script.id = "facebook-jssdk";
+    script.src = "https://connect.facebook.net/pt_BR/sdk.js";
+    script.async = true;
+    script.defer = true;
+    script.onerror = () => rejeitar(new Error("Falha ao carregar o script da Meta"));
+    document.body.appendChild(script);
+  });
+}
+
+type DadosEmbedded = { code?: string; wabaId?: string; phoneNumberId?: string };
+
+/**
+ * Login com Facebook para Empresas: o cliente escolhe o número numa janela
+ * da própria Meta e a gente só recebe de volta um `code` (pop-up) e o
+ * `waba_id`/`phone_number_id` (postMessage) — sem token colado à mão. O
+ * `code` vira token de acesso no servidor, nunca aqui.
+ */
+function FormularioEmbedded({
+  appId,
+  configId,
+  estado,
+  acao,
+  aoFechar,
+  aoUsarManual,
+}: {
+  appId: string;
+  configId: string;
+  estado: EstadoForm;
+  acao: (payload: FormData) => void;
+  aoFechar: () => void;
+  aoUsarManual: () => void;
+}) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [nome, setNome] = useState(() => valorDe(estado, "nome"));
+  const [dados, setDados] = useState<DadosEmbedded>({});
+  // Referência com o mesmo valor de `dados`: as duas peças (code do pop-up,
+  // waba/phone do postMessage) chegam em momentos diferentes e de forma
+  // assíncrona, então cada handler precisa enxergar o valor mais recente na
+  // hora — não o de quando o handler foi criado — pra saber se já pode
+  // submeter sem esperar um efeito reagir à mudança de estado.
+  const dadosRef = useRef<DadosEmbedded>({});
+  const [aguardando, setAguardando] = useState(false);
+  const [avisoLocal, setAvisoLocal] = useState<string | null>(null);
+
+  function acrescentarDados(pedaco: DadosEmbedded) {
+    const atualizado = { ...dadosRef.current, ...pedaco };
+    dadosRef.current = atualizado;
+    setDados(atualizado);
+    if (atualizado.code && atualizado.wabaId && atualizado.phoneNumberId) {
+      setAguardando(false);
+      formRef.current?.requestSubmit();
+    }
+  }
+
+  useEffect(() => {
+    function aoReceberMensagem(evento: MessageEvent) {
+      if (
+        evento.origin !== "https://www.facebook.com" &&
+        evento.origin !== "https://web.facebook.com"
+      ) {
+        return;
+      }
+
+      let payload: unknown;
+      try {
+        payload = JSON.parse(evento.data);
+      } catch {
+        return;
+      }
+      if (
+        typeof payload !== "object" ||
+        payload === null ||
+        (payload as { type?: string }).type !== "WA_EMBEDDED_SIGNUP"
+      ) {
+        return;
+      }
+
+      const corpo = payload as {
+        event?: string;
+        data?: { waba_id?: string; phone_number_id?: string };
+      };
+
+      if (corpo.event === "FINISH" && corpo.data?.waba_id && corpo.data?.phone_number_id) {
+        acrescentarDados({
+          wabaId: corpo.data.waba_id,
+          phoneNumberId: corpo.data.phone_number_id,
+        });
+      }
+
+      if (corpo.event === "CANCEL" || corpo.event === "ERROR") {
+        setAguardando(false);
+        setAvisoLocal("Conexão cancelada na janela da Meta.");
+      }
+    }
+
+    window.addEventListener("message", aoReceberMensagem);
+    return () => window.removeEventListener("message", aoReceberMensagem);
+  }, []);
+
+  async function conectar() {
+    if (!nome.trim()) {
+      setAvisoLocal("Dê um apelido para o número antes de conectar.");
+      return;
+    }
+
+    setAvisoLocal(null);
+    setAguardando(true);
+
+    try {
+      await carregarSdkFacebook(appId);
+    } catch {
+      setAguardando(false);
+      setAvisoLocal("Não foi possível carregar o login da Meta agora. Tente de novo.");
+      return;
+    }
+
+    if (!window.FB) {
+      setAguardando(false);
+      setAvisoLocal("Não foi possível carregar o login da Meta agora. Tente de novo.");
+      return;
+    }
+
+    window.FB.login(
+      (resposta) => {
+        const code = resposta.authResponse?.code;
+        if (!code) {
+          setAguardando(false);
+          setAvisoLocal("Login com a Meta cancelado ou sem permissão concedida.");
+          return;
+        }
+        acrescentarDados({ code });
+      },
+      {
+        config_id: configId,
+        response_type: "code",
+        override_default_response_type: true,
+        extras: { feature: "whatsapp_embedded_signup", sessionInfoVersion: 3 },
+      },
+    );
+  }
+
+  return (
+    <form ref={formRef} action={acao} className="space-y-4">
+      <AvisoForm estado={estado} />
+
+      {avisoLocal && !estado.erro && (
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-[13.5px] text-rose-700"
+        >
+          <Icon name="alert" className="mt-px size-4 shrink-0" />
+          <span>{avisoLocal}</span>
+        </div>
       )}
-    </Modal>
+
+      <Campo
+        label="Apelido do número"
+        dica="Só para você se achar no painel."
+        obrigatorio
+        erro={erroDe(estado, "nome")}
+      >
+        <Input
+          name="nome"
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
+          placeholder="Ex: Recepção"
+          disabled={aguardando}
+          required
+        />
+      </Campo>
+
+      <input type="hidden" name="code" value={dados.code ?? ""} />
+      <input type="hidden" name="wabaId" value={dados.wabaId ?? ""} />
+      <input type="hidden" name="phoneNumberId" value={dados.phoneNumberId ?? ""} />
+
+      <p className="text-[13px] leading-relaxed text-ink-500">
+        Você loga com a conta do WhatsApp Business da empresa numa janela da
+        Meta e escolhe o número por lá — não precisa colar token nem procurar
+        o Phone Number ID.
+      </p>
+
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <button
+          type="button"
+          onClick={aoUsarManual}
+          disabled={aguardando}
+          className="text-[13px] font-medium text-ink-500 hover:text-ink-700 hover:underline disabled:opacity-50"
+        >
+          Prefiro colar os dados manualmente
+        </button>
+        <div className="flex gap-2">
+          <Botao type="button" variante="secundario" onClick={aoFechar} disabled={aguardando}>
+            Cancelar
+          </Botao>
+          <BotaoConectarEmbedded aguardando={aguardando} onClick={conectar} />
+        </div>
+      </div>
+    </form>
+  );
+}
+
+function BotaoConectarEmbedded({
+  aguardando,
+  onClick,
+}: {
+  aguardando: boolean;
+  onClick: () => void;
+}) {
+  // `pending` cobre a ida e volta com o servidor (troca de code por token,
+  // verificação da credencial); `aguardando` cobre a etapa antes disso, o
+  // tempo que o pop-up da Meta fica aberto — nenhuma delas sozinha conta a
+  // história toda.
+  const { pending } = useFormStatus();
+  const carregando = aguardando || pending;
+
+  return (
+    <Botao
+      type="button"
+      variante="zap"
+      icone="whatsapp"
+      onClick={onClick}
+      disabled={carregando}
+    >
+      {carregando ? "Conectando…" : "Conectar com um clique"}
+    </Botao>
   );
 }
 
@@ -280,6 +615,10 @@ export function AcoesConexao({
     desconectarCanalAction,
     ESTADO_INICIAL,
   );
+  useToastEstado(testado);
+  useToastEstado(promovido);
+  useToastEstado(renomeado);
+  useToastEstado(desconectado);
 
   const fecharMenu = () => setMenu(false);
 

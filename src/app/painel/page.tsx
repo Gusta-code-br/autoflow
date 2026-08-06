@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Pagina } from "@/components/shell";
 import { Barra, Botao, Card, CardTitulo, Vazio } from "@/components/ui";
 import { cx } from "@/lib/cx";
+import { FlashToast } from "@/components/toast";
 import { Icon, type IconName } from "@/components/icons";
 import { brl, dataLonga, numero, tempoRelativo } from "@/lib/format";
 import {
@@ -22,11 +23,16 @@ import { GraficoUso } from "./grafico-uso";
  * o store de demonstração no browser, e por isso mostrava a mesma padaria
  * fictícia para todo mundo depois do login.
  */
-export default async function PainelPage() {
-  const [sessao, resumo, uso] = await Promise.all([
+export default async function PainelPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ bemvindo?: string }>;
+}) {
+  const [sessao, resumo, uso, params] = await Promise.all([
     carregarSessaoPainel(),
     resumoPainel(),
     usoDiario(),
+    searchParams,
   ]);
 
   const temCobranca = sessao.plano.features.includes("cobranca");
@@ -70,6 +76,12 @@ export default async function PainelPage() {
       titulo="Visão geral"
       descricao={`${saudacao}, ${sessao.org.nome}! Aqui está um resumo do que está acontecendo hoje.`}
     >
+      {params.bemvindo && (
+        <FlashToast
+          param="bemvindo"
+          mensagem={`Tudo pronto, ${sessao.org.nome}! Sua conta está configurada — agora é só conectar o WhatsApp.`}
+        />
+      )}
       {sessao.conexoes.totais === 0 && (
         <Card className="mb-6 flex flex-col items-start gap-3 border-brand-200 bg-brand-50/60 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">

@@ -3,7 +3,7 @@
 // ao clicar em Concluir e ir ao painel) e confirmar que está corrigido.
 import { chromium } from "playwright";
 
-const BASE = "http://localhost:3000";
+const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 const sufixo = Date.now();
 const email = `e2e-${sufixo}@exemplo.com`;
 const senha = "SenhaForte123!";

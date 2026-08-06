@@ -195,9 +195,12 @@ export async function salvarCanal(
     baseUrl?: string | null;
     instancia?: string | null;
     token: string;
+    /** Embedded Signup: PIN de 2 etapas usado no `/register` da Cloud API. */
+    pin?: string | null;
   },
 ): Promise<{ canalId: string; webhookToken: string | null }> {
   const cifrado = cifrar(entrada.token, `canal:${entrada.orgId}`);
+  const pinCifrado = entrada.pin ? cifrar(entrada.pin, `canal-pin:${entrada.orgId}`) : null;
 
   /**
    * Provedor não-oficial não assina o webhook: a autenticação dele é o segredo
@@ -222,16 +225,17 @@ export async function salvarCanal(
   const [linha] = await tx<{ id: string }[]>`
     INSERT INTO canal_whatsapp
       (org_id, provedor, nome, numero_e164, waba_id, phone_number_id,
-       base_url, instancia, token_cif, chave_versao, webhook_token_hash,
+       base_url, instancia, token_cif, pin_cif, chave_versao, webhook_token_hash,
        status, principal, verificado_em)
     VALUES
       (${entrada.orgId}, ${entrada.provedor}, ${entrada.nome},
        ${entrada.numeroE164}, ${entrada.wabaId ?? null},
        ${entrada.phoneNumberId ?? null}, ${entrada.baseUrl ?? null},
-       ${entrada.instancia ?? null}, ${cifrado}, ${versaoAtual()},
+       ${entrada.instancia ?? null}, ${cifrado}, ${pinCifrado}, ${versaoAtual()},
        ${webhook?.hash ?? null}, 'conectado', true, now())
     ON CONFLICT (org_id, numero_e164) DO UPDATE
        SET token_cif       = EXCLUDED.token_cif,
+           pin_cif         = COALESCE(EXCLUDED.pin_cif, canal_whatsapp.pin_cif),
            chave_versao    = EXCLUDED.chave_versao,
            provedor        = EXCLUDED.provedor,
            phone_number_id = EXCLUDED.phone_number_id,

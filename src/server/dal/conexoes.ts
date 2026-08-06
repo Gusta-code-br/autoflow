@@ -12,6 +12,13 @@ import {
   verificarCanal,
   verificarCredenciais,
 } from "../canais/fabrica";
+import {
+  ErroEmbeddedSignup,
+  assinarWebhookWaba,
+  gerarPin,
+  registrarNumero,
+  trocarCodePorToken,
+} from "../canais/embedded-signup";
 import { normalizarE164 } from "../dominio/telefone";
 
 /**
@@ -189,6 +196,11 @@ export interface ConexaoCriada {
   numero: string;
   /** Só a Evolution devolve — e só nesta resposta. */
   webhookUrl: string | null;
+  /**
+   * Ressalva não bloqueante (ex.: registro de número na Cloud API falhou mas
+   * a credencial em si é válida). `null` no caminho feliz.
+   */
+  aviso: string | null;
 }
 
 /**
@@ -271,6 +283,135 @@ export async function conectarCanal(entrada: EntradaConexao): Promise<ConexaoCri
     webhookUrl: salvo.webhookToken
       ? urlWebhookEvolution(salvo.canalId, salvo.webhookToken)
       : null,
+    aviso: null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Conectar via Embedded Signup (login com Facebook para Empresas)
+
+const entradaConexaoEmbedded = z.object({
+  nome: z.string().trim().min(2, "Dê um nome para reconhecer este número").max(60),
+  code: z.string().trim().min(10, "Código de autorização ausente — tente conectar de novo"),
+  wabaId: z
+    .string()
+    .trim()
+    .min(1, "A Meta não informou a conta de WhatsApp Business — tente conectar de novo"),
+  phoneNumberId: z
+    .string()
+    .trim()
+    .min(1, "A Meta não informou o número escolhido — tente conectar de novo"),
+});
+
+export type EntradaConexaoEmbedded = z.infer<typeof entradaConexaoEmbedded>;
+export { entradaConexaoEmbedded };
+
+/**
+ * Conecta um número pelo Embedded Signup: troca o `code` do pop-up por um
+ * token, assina os webhooks da WABA, registra o número na Cloud API e só
+ * então grava — mesma ordem "testa antes de salvar" do fluxo manual.
+ *
+ * O registro na Cloud API (`registrarNumero`) é a única etapa tratada como
+ * ressalva em vez de erro fatal: um número que a agência já configurou antes
+ * (migrado de outro BSP, verificação em duas etapas já ligada por outra
+ * pessoa) pode recusar o PIN que a gente gerou mesmo com credencial válida —
+ * bloquear a conexão inteira por isso seria pior que avisar e deixar o
+ * cliente testar o envio.
+ */
+export async function conectarCanalEmbedded(
+  entradaBruta: EntradaConexaoEmbedded,
+): Promise<ConexaoCriada> {
+  const ctx = await exigirPapel("admin", "conectar um número de WhatsApp");
+  const entrada = entradaConexaoEmbedded.parse(entradaBruta);
+
+  const token = await trocarCodePorToken(entrada.code).catch((erro) => {
+    if (erro instanceof ErroEmbeddedSignup) {
+      throw new CredencialInvalidaError(erro.message, erro.codigo);
+    }
+    throw erro;
+  });
+
+  const verificacao = await verificarCredenciais({
+    provedor: "meta_cloud",
+    token,
+    phoneNumberId: entrada.phoneNumberId,
+    baseUrl: null,
+    instancia: null,
+  });
+
+  if (!verificacao.ok) {
+    throw new CredencialInvalidaError(verificacao.erro, verificacao.codigo);
+  }
+
+  const numero = verificacao.numero ? normalizarE164(verificacao.numero) : null;
+  if (!numero) {
+    throw new CredencialInvalidaError(
+      "A Meta não devolveu o número deste WhatsApp. Tente conectar de novo.",
+      "numero",
+    );
+  }
+
+  const painel = await listarConexoes();
+  const jaExiste = painel.conexoes.some((c) => c.numero === numero);
+  if (!jaExiste && painel.disponiveis === 0) {
+    throw new LimiteConexoesError(painel.totais);
+  }
+
+  await assinarWebhookWaba(token, entrada.wabaId).catch((erro) => {
+    if (erro instanceof ErroEmbeddedSignup) {
+      throw new CredencialInvalidaError(erro.message, erro.codigo);
+    }
+    throw erro;
+  });
+
+  const pin = gerarPin();
+  let aviso: string | null = null;
+  try {
+    await registrarNumero(token, entrada.phoneNumberId, pin);
+  } catch (erro) {
+    aviso =
+      erro instanceof ErroEmbeddedSignup
+        ? `Conexão feita, mas o registro automático do número falhou: ${erro.message} Se o envio não funcionar, procure o suporte.`
+        : "Conexão feita, mas não foi possível confirmar o registro do número. Se o envio não funcionar, procure o suporte.";
+  }
+
+  const salvo = await comOrg(ctx.orgId, async (tx) => {
+    const r = await salvarCanal(tx, {
+      orgId: ctx.orgId,
+      provedor: "meta_cloud",
+      nome: entrada.nome,
+      numeroE164: numero,
+      wabaId: entrada.wabaId,
+      phoneNumberId: entrada.phoneNumberId,
+      baseUrl: null,
+      instancia: null,
+      token,
+      pin: aviso ? null : pin,
+    });
+
+    if (verificacao.qualidade || verificacao.limiteDiario) {
+      await tx`
+        UPDATE canal_whatsapp
+           SET qualidade = ${verificacao.qualidade ?? null},
+               limite_diario = ${verificacao.limiteDiario ?? null}
+         WHERE id = ${r.canalId}
+      `;
+    }
+
+    await auditar(tx, ctx, "canal.conectado", "canal_whatsapp", r.canalId, {
+      provedor: "meta_cloud",
+      numero,
+      via: "embedded_signup",
+    });
+
+    return r;
+  });
+
+  return {
+    canalId: salvo.canalId,
+    numero,
+    webhookUrl: null,
+    aviso,
   };
 }
 

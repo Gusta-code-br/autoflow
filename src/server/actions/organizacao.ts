@@ -56,7 +56,9 @@ export async function salvarOnboardingAction(
   }
 
   // Onboarding é a última tela antes do produto: manda para o painel já.
-  redirect("/painel");
+  // O `?bemvindo=1` vira um toast de boas-vindas (ver <FlashToast>) — sem ele
+  // o cliente termina 4 perguntas e a tela seguinte não confirma nada.
+  redirect("/painel?bemvindo=1");
 }
 
 /**

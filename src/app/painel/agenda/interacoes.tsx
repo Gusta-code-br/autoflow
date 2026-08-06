@@ -10,6 +10,7 @@ import {
   erroDe,
   valorDe,
 } from "@/components/form";
+import { useToastEstado } from "@/components/toast";
 import { Botao, Campo, Input, Modal, Select, Textarea } from "@/components/ui";
 import { ESTADO_INICIAL, type EstadoForm } from "@/lib/form";
 import {
@@ -57,6 +58,7 @@ export function BotaoNovo({
   const [estado, acao] = useActionState(criarAgendamentoAction, ESTADO_INICIAL);
 
   useFechaAoSalvar(estado, () => setAberto(false));
+  useToastEstado(estado);
 
   return (
     <>
@@ -184,7 +186,8 @@ const PROXIMOS: Record<string, { status: string; rotulo: string }[]> = {
 };
 
 export function AcoesAgendamento({ id, status }: { id: string; status: string }) {
-  const [, acao] = useActionState(mudarStatusAction, ESTADO_INICIAL);
+  const [estado, acao] = useActionState(mudarStatusAction, ESTADO_INICIAL);
+  useToastEstado(estado);
   const opcoes = PROXIMOS[status] ?? [];
   if (opcoes.length === 0) return null;
 
@@ -218,6 +221,7 @@ export function BotaoBloquear({ dia }: { dia: string }) {
   const [estado, acao] = useActionState(criarBloqueioAction, ESTADO_INICIAL);
 
   useFechaAoSalvar(estado, () => setAberto(false));
+  useToastEstado(estado);
 
   return (
     <>
@@ -287,7 +291,8 @@ export function BotaoBloquear({ dia }: { dia: string }) {
 }
 
 export function BotaoRemoverBloqueio({ id }: { id: string }) {
-  const [, acao] = useActionState(removerBloqueioAction, ESTADO_INICIAL);
+  const [estado, acao] = useActionState(removerBloqueioAction, ESTADO_INICIAL);
+  useToastEstado(estado);
   return (
     <form action={acao}>
       <input type="hidden" name="id" value={id} />
@@ -305,6 +310,7 @@ export function BotaoServico({ servico }: { servico?: ServicoDTO }) {
   const [estado, acao] = useActionState(salvarServicoAction, ESTADO_INICIAL);
 
   useFechaAoSalvar(estado, () => setAberto(false));
+  useToastEstado(estado);
 
   const editar = servico !== undefined;
 

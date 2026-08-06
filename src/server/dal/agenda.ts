@@ -138,7 +138,7 @@ export async function painelAgenda(dia?: DataLocal): Promise<PainelAgenda> {
         JOIN contato ct ON ct.id = a.contato_id
         LEFT JOIN servico s ON s.id = a.servico_id
        WHERE a.inicio >= (date_trunc('week', ${ancora}::date) AT TIME ZONE ${org.fuso})
-         AND a.inicio <  (date_trunc('week', ${ancora}::date) + interval '7 days'
+         AND a.inicio <  ((date_trunc('week', ${ancora}::date) + interval '7 days')
                           AT TIME ZONE ${org.fuso})
        ORDER BY a.inicio
     `;
@@ -149,7 +149,7 @@ export async function painelAgenda(dia?: DataLocal): Promise<PainelAgenda> {
       SELECT id, motivo, inicio, fim
         FROM bloqueio_agenda
        WHERE fim >= (date_trunc('week', ${ancora}::date) AT TIME ZONE ${org.fuso})
-         AND inicio < (date_trunc('week', ${ancora}::date) + interval '7 days'
+         AND inicio < ((date_trunc('week', ${ancora}::date) + interval '7 days')
                        AT TIME ZONE ${org.fuso})
        ORDER BY inicio
     `;

@@ -25,20 +25,21 @@ import { Aguardando, CodigoPix } from "./interacoes";
  * abre para a organização dona dele.
  */
 
+// Espelha o enum `status_pagamento` do banco — não são rótulos livres.
 const TOM = {
   pendente: "aviso",
-  pago: "sucesso",
-  cancelado: "neutro",
+  aprovado: "sucesso",
+  recusado: "perigo",
   estornado: "neutro",
-  falhou: "perigo",
+  expirado: "neutro",
 } as const;
 
 const ROTULO: Record<string, string> = {
   pendente: "Aguardando pagamento",
-  pago: "Pago",
-  cancelado: "Cancelado",
+  aprovado: "Pago",
+  recusado: "Não autorizado",
   estornado: "Estornado",
-  falhou: "Não autorizado",
+  expirado: "Expirado",
 };
 
 export default async function CheckoutPage({
@@ -165,7 +166,7 @@ export default async function CheckoutPage({
           </Card>
         )}
 
-        {pagamento.status === "pago" && (
+        {pagamento.status === "aprovado" && (
           <Card className="p-5">
             <div className="flex items-start gap-3">
               <Icon name="check" className="mt-0.5 size-4 shrink-0 text-emerald-600" />

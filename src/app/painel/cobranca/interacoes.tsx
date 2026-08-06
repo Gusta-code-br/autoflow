@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 
 import { AvisoForm, BotaoEnviar, erroDe, valorDe } from "@/components/form";
 import { Icon } from "@/components/icons";
+import { useToastEstado } from "@/components/toast";
 import { Botao, Campo, Input, Modal, Select, Textarea } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { ESTADO_INICIAL, type EstadoForm } from "@/lib/form";
@@ -43,6 +44,7 @@ export function BotaoNovaCobranca({
   const [vencimentoPadrao, setVencimentoPadrao] = useState("");
   const [aberto, setAberto] = useState(false);
   const [estado, acao] = useActionState(criarCobrancaAction, ESTADO_INICIAL);
+  useToastEstado(estado);
 
   const padrao = reguas.find((r) => r.padrao) ?? reguas[0];
 
@@ -210,6 +212,8 @@ export function AcoesCobranca({
     cancelarCobrancaAction,
     ESTADO_INICIAL,
   );
+  useToastEstado(pago);
+  useToastEstado(cancelado);
 
   if (encerrada) return <Retorno estado={pago} />;
 
@@ -331,6 +335,10 @@ export function AcoesRegua({
     arquivarReguaAction,
     ESTADO_INICIAL,
   );
+  useToastEstado(alternado);
+  useToastEstado(promovido);
+  useToastEstado(duplicado);
+  useToastEstado(arquivado);
 
   return (
     <>
