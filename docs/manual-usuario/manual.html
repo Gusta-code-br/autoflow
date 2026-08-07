@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>AutoFlow — Guia de Telas</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1f2430;
+    background: #ffffff;
+  }
+  .slide {
+    width: 297mm;
+    height: 210mm;
+    padding: 12mm 14mm;
+    display: flex;
+    flex-direction: column;
+    page-break-after: always;
+    position: relative;
+    overflow: hidden;
+  }
+  .slide:last-child { page-break-after: avoid; }
+
+  /* ---------- Capa ---------- */
+  .capa {
+    justify-content: center;
+    align-items: flex-start;
+    background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 55%, #a855f7 100%);
+    color: #fff;
+    padding: 22mm 24mm;
+  }
+  .capa .selo {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 999px;
+    padding: 4px 14px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+  .capa h1 { font-size: 46px; margin: 0 0 10px; line-height: 1.1; }
+  .capa p.sub { font-size: 18px; opacity: 0.92; max-width: 560px; line-height: 1.5; }
+  .capa .rodape-capa {
+    position: absolute; bottom: 16mm; left: 24mm; right: 24mm;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; opacity: 0.85;
+  }
+
+  /* ---------- Sumário ---------- */
+  .sumario h2 { font-size: 26px; margin: 0 0 4mm; color: #4c1d95; }
+  .sumario .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4mm 14mm;
+    margin-top: 6mm;
+  }
+  .sumario .item {
+    display: flex; align-items: baseline; gap: 8px;
+    font-size: 13.5px; padding: 4px 0;
+    border-bottom: 1px dashed #e2ddf5;
+  }
+  .sumario .item .n {
+    font-weight: 700; color: #7c3aed; min-width: 20px;
+  }
+
+  /* ---------- Slide de conteúdo ---------- */
+  .conteudo {
+    flex: 1;
+    display: flex;
+    gap: 10mm;
+    min-height: 0;
+  }
+  .conteudo .lado-texto {
+    width: 84mm;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .conteudo .lado-imagem {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    background: #f4f2fb;
+    border-radius: 10px;
+    border: 1px solid #e6e1f7;
+    overflow: hidden;
+    position: relative;
+  }
+  .conteudo .lado-imagem img {
+    width: 100%;
+    height: auto;
+    display: block;
+    box-shadow: 0 2px 14px rgba(76,29,149,0.12);
+  }
+  .conteudo .lado-imagem.centraliza {
+    align-items: center;
+  }
+  .conteudo .lado-imagem.centraliza img {
+    width: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .kicker {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: #7c3aed; font-weight: 700; margin-bottom: 4px;
+  }
+  .titulo { font-size: 24px; font-weight: 800; margin: 0 0 8px; color: #1f2430; line-height: 1.15; }
+  .resumo { font-size: 13px; line-height: 1.55; color: #4b4f5a; margin-bottom: 10px; }
+
+  .lista-pontos { list-style: none; margin: 0; padding: 0; }
+  .lista-pontos li {
+    font-size: 12.5px; line-height: 1.5; color: #33374a;
+    padding: 5px 0 5px 20px; position: relative;
+    border-bottom: 1px solid #f0eef8;
+  }
+  .lista-pontos li:last-child { border-bottom: none; }
+  .lista-pontos li::before {
+    content: "";
+    position: absolute; left: 2px; top: 11px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #7c3aed;
+  }
+  .lista-pontos b { color: #1f2430; }
+
+  .caixa-dica {
+    margin-top: auto;
+    background: #fff8ec;
+    border: 1px solid #f4dfa8;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: #6b4b06;
+  }
+  .caixa-dica b { color: #8a5c00; }
+
+  .rodape {
+    margin-top: 6mm;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; color: #a3a0b5;
+    border-top: 1px solid #eee;
+    padding-top: 3mm;
+  }
+  .rodape .marca { font-weight: 700; color: #7c3aed; }
+
+  .secao-titulo {
+    display: flex; align-items: center; justify-content: center;
+    background: #1f2430;
+    color: #fff;
+  }
+  .secao-titulo .miolo { text-align: left; max-width: 620px; }
+  .secao-titulo .num-secao {
+    font-size: 13px; color: #b8a9f2; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px;
+  }
+  .secao-titulo h2 { font-size: 38px; margin: 0 0 10px; }
+  .secao-titulo p { font-size: 15px; color: #cfcbe0; line-height: 1.6; margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- CAPA -->
+<section class="slide capa">
+  <div class="selo">Guia de uso · Não técnico</div>
+  <h1>AutoFlow</h1>
+  <p class="sub">Manual visual de todas as telas do sistema: o que cada tela faz, para que serve
+  cada botão e como o dia a dia do seu negócio fica mais simples com a IA cuidando do
+  WhatsApp, da agenda e da cobrança.</p>
+  <div class="rodape-capa">
+    <span>Documento gerado a partir do ambiente de demonstração</span>
+    <span>autoflow.com.br</span>
+  </div>
+</section>
+
+<!-- SUMÁRIO -->
+<section class="slide sumario">
+  <div class="kicker">Sumário</div>
+  <h2>O que você vai encontrar neste guia</h2>
+  <div class="grid">
+    <div class="item"><span class="n">01</span> Página inicial (site)</div>
+    <div class="item"><span class="n">02</span> Tela de login</div>
+    <div class="item"><span class="n">03</span> Cadastro da conta</div>
+    <div class="item"><span class="n">04</span> Cadastro preenchido</div>
+    <div class="item"><span class="n">05</span> Onboarding — passo 1: seu negócio</div>
+    <div class="item"><span class="n">06</span> Onboarding — passo 2: atendente</div>
+    <div class="item"><span class="n">07</span> Onboarding — passo 3: horário</div>
+    <div class="item"><span class="n">08</span> Painel recém-criado (vazio)</div>
+    <div class="item"><span class="n">09</span> Visão geral (com dados)</div>
+    <div class="item"><span class="n">10</span> Atendimento — lista de conversas</div>
+    <div class="item"><span class="n">11</span> Atendimento — conversa aberta</div>
+    <div class="item"><span class="n">12</span> Agenda (recurso do plano Completo)</div>
+    <div class="item"><span class="n">13</span> Agenda liberada (plano Completo)</div>
+    <div class="item"><span class="n">14</span> Cobrança</div>
+    <div class="item"><span class="n">15</span> Conexões (WhatsApp)</div>
+    <div class="item"><span class="n">16</span> Plano e créditos</div>
+    <div class="item"><span class="n">17</span> Ajustes da IA</div>
+  </div>
+</section>
+
+<!-- SEÇÃO 1 -->
+<section class="slide secao-titulo">
+  <div class="miolo">
+    <div class="num-secao">Parte 1 de 3</div>
+    <h2>Antes de entrar: site e cadastro</h2>
+    <p>Como um novo cliente conhece o AutoFlow, cria a conta e configura o negócio pela
+    primeira vez — do zero até o painel pronto para uso.</p>
+  </div>
+</section>
+
+<!-- 00 landing -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 01 · Site</div>
+      <div class="titulo">Página inicial</div>
+      <div class="resumo">É a vitrine do AutoFlow: a página pública que qualquer pessoa vê antes de
+      criar a conta, explicando o que o sistema faz e convidando para o cadastro.</div>
+      <ul class="lista-pontos">
+        <li><b>Objetivo:</b> apresentar o produto e levar o visitante até o cadastro.</li>
+        <li>Mostra os planos e o botão para começar (leva à tela de Cadastro).</li>
+        <li>Também tem o botão <b>Entrar</b>, para quem já tem conta.</li>
+      </ul>
+      <div class="caixa-dica"><b>Não precisa mexer aqui:</b> é a porta de entrada do sistema, o cliente só passa por ela uma vez.</div>
+    </div>
+    <div class="lado-imagem"><img src="00-landing.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 01</span></div>
+</section>
+
+<!-- 01 entrar -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 02 · Acesso</div>
+      <div class="titulo">Entrar (login)</div>
+      <div class="resumo">Tela onde quem já tem uma conta digita e-mail e senha para acessar o
+      painel do seu negócio.</div>
+      <ul class="lista-pontos">
+        <li><b>Objetivo:</b> autenticar o usuário e abrir o painel da sua empresa.</li>
+        <li>Cada organização tem seus próprios dados — ninguém vê a conversa ou agenda de outra empresa.</li>
+        <li>Se ainda não tem conta, o link leva para o Cadastro.</li>
+      </ul>
+      <div class="caixa-dica"><b>Dica:</b> guarde bem sua senha — é ela que protege os dados dos seus clientes.</div>
+    </div>
+    <div class="lado-imagem"><img src="01-entrar.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 02</span></div>
+</section>
+
+<!-- 02 cadastro vazio -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 03 · Cadastro</div>
+      <div class="titulo">Criar conta</div>
+      <div class="resumo">Primeiro passo para começar a usar o AutoFlow: nome, empresa, e-mail,
+      telefone e uma senha.</div>
+      <ul class="lista-pontos">
+        <li><b>Nome</b> — quem está criando a conta (o dono/responsável).</li>
+        <li><b>Nome da empresa</b> — aparece para os seus clientes no WhatsApp.</li>
+        <li><b>E-mail e senha</b> — usados depois para fazer login.</li>
+        <li>Ao concluir, o sistema já leva direto para a configuração inicial (onboarding).</li>
+      </ul>
+      <div class="caixa-dica"><b>Importante:</b> toda conta nova começa com um período de teste (trial), sem precisar de cartão de crédito.</div>
+    </div>
+    <div class="lado-imagem"><img src="02-cadastro-vazio.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 03</span></div>
+</section>
+
+<!-- 02b cadastro preenchido -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 04 · Cadastro</div>
+      <div class="titulo">Cadastro preenchido</div>
+      <div class="resumo">O mesmo formulário anterior, agora com um exemplo de preenchimento —
+      assim fica claro o formato esperado em cada campo.</div>
+      <ul class="lista-pontos">
+        <li>O telefone é usado como referência de contato, não é o número do WhatsApp da IA.</li>
+        <li>A senha deve ser razoavelmente forte (letras, números).</li>
+        <li>Depois de clicar em <b>Criar minha conta</b>, o sistema segue automaticamente para o onboarding.</li>
+      </ul>
+    </div>
+    <div class="lado-imagem"><img src="02b-cadastro-preenchido.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 04</span></div>
+</section>
+
+<!-- 03 onboarding 1 -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 05 · Configuração inicial</div>
+      <div class="titulo">Onboarding — passo 1: seu negócio</div>
+      <div class="resumo">Primeira pergunta do assistente de configuração: qual é o segmento do
+      seu negócio (clínica, salão, consultório, etc.).</div>
+      <ul class="lista-pontos">
+        <li>O sistema usa essa resposta para ajustar a linguagem e os exemplos que a IA usa
+        ao conversar com seus clientes.</li>
+        <li>São só 3 passos rápidos — leva menos de 2 minutos.</li>
+      </ul>
+      <div class="caixa-dica"><b>Dica:</b> pode ser ajustado depois em <i>Ajustes da IA</i>, sem precisar refazer o cadastro.</div>
+    </div>
+    <div class="lado-imagem"><img src="03-onboarding-1-negocio.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 05</span></div>
+</section>
+
+<!-- 04 onboarding 2 -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 06 · Configuração inicial</div>
+      <div class="titulo">Onboarding — passo 2: o atendente</div>
+      <div class="resumo">Aqui você dá um nome para a IA que vai atender seus clientes no
+      WhatsApp — o "rosto" digital do seu atendimento.</div>
+      <ul class="lista-pontos">
+        <li>Esse nome aparece nas conversas, deixando o atendimento mais pessoal.</li>
+        <li>Pode ser trocado a qualquer momento nas configurações.</li>
+      </ul>
+    </div>
+    <div class="lado-imagem"><img src="04-onboarding-2-atendente.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 06</span></div>
+</section>
+
+<!-- 05 onboarding 3 -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 07 · Configuração inicial</div>
+      <div class="titulo">Onboarding — passo 3: horário e contato</div>
+      <div class="resumo">Último passo: horário de atendimento e o WhatsApp pessoal que vai
+      receber os avisos importantes (como um novo agendamento).</div>
+      <ul class="lista-pontos">
+        <li>O horário ajuda a IA a saber quando o negócio está aberto para marcar horários.</li>
+        <li>O WhatsApp pessoal é só seu — os clientes nunca falam com ele diretamente.</li>
+        <li>Ao concluir, o painel principal é aberto automaticamente.</li>
+      </ul>
+    </div>
+    <div class="lado-imagem"><img src="05-onboarding-3-horario.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 07</span></div>
+</section>
+
+<!-- 06 painel vazio -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 08 · Painel</div>
+      <div class="titulo">Painel recém-criado</div>
+      <div class="resumo">É assim que o painel aparece assim que a configuração inicial termina
+      — ainda sem conversas, agendamentos ou cobranças, pronto para começar a usar de verdade.</div>
+      <ul class="lista-pontos">
+        <li>O menu à esquerda já mostra todas as áreas do sistema.</li>
+        <li>O próximo passo natural é conectar o número de WhatsApp em <b>Conexões</b>.</li>
+      </ul>
+    </div>
+    <div class="lado-imagem"><img src="06-painel-vazio-pos-onboarding.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 08</span></div>
+</section>
+
+<!-- SEÇÃO 2 -->
+<section class="slide secao-titulo">
+  <div class="miolo">
+    <div class="num-secao">Parte 2 de 3</div>
+    <h2>O dia a dia: painel em uso</h2>
+    <p>As telas do dia a dia, já com conversas, agendamentos e cobranças reais —
+    o que você e sua equipe vão ver toda vez que abrirem o AutoFlow.</p>
+  </div>
+</section>
+
+<!-- 10 painel visao geral -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 09 · Visão geral</div>
+      <div class="titulo">Painel principal</div>
+      <div class="resumo">O resumo do seu negócio em um só lugar: quantas conversas estão
+      rolando, quantos agendamentos há na semana e como está a saúde financeira.</div>
+      <ul class="lista-pontos">
+        <li>Cartões de resumo mostram números importantes rapidamente, sem precisar abrir cada área.</li>
+        <li>A partir daqui você navega para Atendimento, Agenda, Cobrança, etc. pelo menu lateral.</li>
+      </ul>
+    </div>
+    <div class="lado-imagem"><img src="10-painel-visao-geral.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 09</span></div>
+</section>
+
+<!-- 11 atendimento lista -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 10 · Atendimento</div>
+      <div class="titulo">Lista de conversas</div>
+      <div class="resumo">Todas as conversas do WhatsApp em um só lugar, como uma caixa de
+      entrada — as que a IA está cuidando e as que precisam da sua atenção.</div>
+      <ul class="lista-pontos">
+        <li>É possível ver rapidamente quem mandou mensagem por último e se já foi respondido.</li>
+        <li>Clicando em uma conversa, você abre o histórico completo com aquele cliente.</li>
+      </ul>
+      <div class="caixa-dica"><b>Dica:</b> você pode assumir uma conversa a qualquer momento, pausando a IA só naquele atendimento.</div>
+    </div>
+    <div class="lado-imagem"><img src="11-atendimento-lista.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 10</span></div>
+</section>
+
+<!-- 11b atendimento detalhe -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 11 · Atendimento</div>
+      <div class="titulo">Conversa aberta</div>
+      <div class="resumo">O histórico completo de mensagens trocadas com um cliente específico,
+      igual a um WhatsApp normal — só que você também pode ver o que a IA já respondeu.</div>
+      <ul class="lista-pontos">
+        <li>Mostra mensagens do cliente e as respostas automáticas da IA lado a lado.</li>
+        <li>Você pode digitar e enviar uma mensagem manualmente quando quiser.</li>
+      </ul>
+    </div>
+    <div class="lado-imagem"><img src="11b-atendimento-detalhe.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 11</span></div>
+</section>
+
+<!-- 12 agenda bloqueada -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 12 · Agenda</div>
+      <div class="titulo">Agenda (recurso do plano Completo)</div>
+      <div class="resumo">A Agenda mostra os horários que a IA marcou direto na conversa do
+      WhatsApp. Ela faz parte do <b>plano Completo</b> — em planos menores, aparece esta tela
+      de convite para upgrade.</div>
+      <ul class="lista-pontos">
+        <li>Explica o que o recurso faz e mostra o preço do plano que o inclui.</li>
+        <li>O botão <b>Fazer upgrade agora</b> troca de plano cobrando só a diferença do que
+        falta no ciclo atual — sem "perder" o que já foi pago.</li>
+      </ul>
+      <div class="caixa-dica"><b>Isso não é um erro:</b> é assim mesmo que o sistema se comporta para contas no plano Profissional. Veja na próxima página como fica no plano Completo.</div>
+    </div>
+    <div class="lado-imagem"><img src="12-agenda.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 12</span></div>
+</section>
+
+<!-- 12b agenda completo -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 13 · Agenda</div>
+      <div class="titulo">Agenda liberada (plano Completo)</div>
+      <div class="resumo">Com o plano Completo, a Agenda mostra a semana, os horários do dia e
+      os serviços cadastrados — tudo o que a IA já marcou automaticamente com seus clientes.</div>
+      <ul class="lista-pontos">
+        <li>Cartões no topo resumem: agendamentos de hoje, dos próximos 7 dias e quantos
+        aguardam confirmação do cliente.</li>
+        <li>Cada linha do dia mostra o cliente, o serviço e botões para <b>Confirmar</b>,
+        marcar como <b>Atendido</b>/<b>Faltou</b> ou <b>Cancelar</b>.</li>
+        <li>Do lado direito, a lista de <b>Serviços</b> define o que a IA pode oferecer e
+        quanto tempo reservar para cada um.</li>
+        <li>O botão <b>Bloquear</b> reserva um horário para você (ex: almoço), sem oferecer aos clientes.</li>
+      </ul>
+    </div>
+    <div class="lado-imagem"><img src="12b-agenda-completo.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 13</span></div>
+</section>
+
+<!-- 13 cobranca -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 14 · Cobrança</div>
+      <div class="titulo">Cobrança</div>
+      <div class="resumo">A lista de cobranças pendentes ou já pagas dos seus clientes — o
+      AutoFlow envia lembretes automáticos de pagamento pelo WhatsApp.</div>
+      <ul class="lista-pontos">
+        <li>Você pode criar uma cobrança nova a qualquer momento, informando cliente e valor.</li>
+        <li>Cada cobrança mostra o status: aguardando, paga ou cancelada.</li>
+        <li>Reduz o trabalho manual de "cobrar quem ainda não pagou" — a IA lembra por você.</li>
+      </ul>
+    </div>
+    <div class="lado-imagem"><img src="13-cobranca-lista.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 14</span></div>
+</section>
+
+<!-- 14 conexoes -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 15 · Conexões</div>
+      <div class="titulo">Conexões (WhatsApp)</div>
+      <div class="resumo">Onde você conecta o número de WhatsApp que a IA vai usar para
+      conversar com seus clientes.</div>
+      <ul class="lista-pontos">
+        <li>Mostra se o número está conectado e funcionando normalmente.</li>
+        <li>Dependendo do seu plano, é possível conectar mais de um número de WhatsApp.</li>
+        <li>A conexão usa a tecnologia oficial do WhatsApp (Meta), garantindo estabilidade.</li>
+      </ul>
+      <div class="caixa-dica"><b>Atenção:</b> desconectar aqui interrompe o atendimento automático até reconectar.</div>
+    </div>
+    <div class="lado-imagem"><img src="14-conexoes.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 15</span></div>
+</section>
+
+<!-- 15 creditos -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 16 · Plano e créditos</div>
+      <div class="titulo">Plano e créditos</div>
+      <div class="resumo">Mostra qual plano sua empresa está usando, quanto já foi consumido
+      de mensagens da IA no mês, e permite comprar créditos extras ou trocar de plano.</div>
+      <ul class="lista-pontos">
+        <li>A barra de créditos mostra o quanto já foi usado do limite mensal de mensagens da IA.</li>
+        <li>É possível comprar um pacote extra de créditos se o limite do mês estiver acabando.</li>
+        <li>Também é daqui que se faz upgrade ou downgrade de plano.</li>
+      </ul>
+    </div>
+    <div class="lado-imagem"><img src="15-creditos.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 16</span></div>
+</section>
+
+<!-- 16 config -->
+<section class="slide">
+  <div class="conteudo">
+    <div class="lado-texto">
+      <div class="kicker">Tela 17 · Ajustes da IA</div>
+      <div class="titulo">Ajustes da IA</div>
+      <div class="resumo">Onde você personaliza como a IA se comporta ao conversar com seus
+      clientes: tom de voz, horário de funcionamento, e regras específicas do seu negócio.</div>
+      <ul class="lista-pontos">
+        <li>Permite ajustar o nome do atendente, o segmento do negócio e instruções específicas.</li>
+        <li>Essas configurações moldam automaticamente como a IA responde no WhatsApp.</li>
+        <li>Alterações aqui valem para todas as conversas futuras, sem precisar reconfigurar o sistema.</li>
+      </ul>
+    </div>
+    <div class="lado-imagem"><img src="16-config.png"></div>
+  </div>
+  <div class="rodape"><span class="marca">AutoFlow</span><span>Guia de telas — 17</span></div>
+</section>
+
+<!-- ENCERRAMENTO -->
+<section class="slide secao-titulo">
+  <div class="miolo">
+    <div class="num-secao">Fim do guia</div>
+    <h2>Pronto para usar o AutoFlow</h2>
+    <p>Com essas 17 telas você já conhece todo o caminho: do cadastro até o dia a dia
+    de atendimento, agenda e cobrança automatizados pela IA no WhatsApp.
+    Qualquer dúvida, este guia pode ser consultado a qualquer momento.</p>
+  </div>
+</section>
+
+</body>
+</html>
