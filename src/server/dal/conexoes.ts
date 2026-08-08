@@ -213,17 +213,26 @@ export interface ConexaoCriada {
 export async function conectarCanal(entrada: EntradaConexao): Promise<ConexaoCriada> {
   const ctx = await exigirPapel("admin", "conectar um número de WhatsApp");
 
-  const numero = normalizarE164(entrada.numero);
-  if (!numero) {
-    throw new CredencialInvalidaError("Número de WhatsApp inválido", "numero");
-  }
+  /*
+   * O número digitado é só uma pista até confirmarmos com o provedor (ver
+   * comentário mais abaixo — "confiamos no provedor"). Não recusamos a
+   * conexão só porque a heurística de DDD brasileiro não reconheceu um
+   * número estrangeiro sem '+' explícito (ex.: número de teste da Meta
+   * colado sem o formato internacional): isso só limita a checagem
+   * antecipada de limite do plano, que roda de novo com o número real do
+   * provedor quando não dá para identificar o digitado.
+   */
+  const numeroDigitado = normalizarE164(entrada.numero);
 
   // Limite do plano: contamos antes de falar com o provedor para não fazer o
-  // cliente esperar por uma chamada externa que vai ser descartada.
-  const painel = await listarConexoes();
-  const jaExiste = painel.conexoes.some((c) => c.numero === numero);
-  if (!jaExiste && painel.disponiveis === 0) {
-    throw new LimiteConexoesError(painel.totais);
+  // cliente esperar por uma chamada externa que vai ser descartada. Só dá
+  // para checar cedo quando o número digitado foi reconhecido.
+  if (numeroDigitado) {
+    const painel = await listarConexoes();
+    const jaExiste = painel.conexoes.some((c) => c.numero === numeroDigitado);
+    if (!jaExiste && painel.disponiveis === 0) {
+      throw new LimiteConexoesError(painel.totais);
+    }
   }
 
   const verificacao = await verificarCredenciais({
@@ -245,7 +254,21 @@ export async function conectarCanal(entrada: EntradaConexao): Promise<ConexaoCri
    * nunca acharia esta linha. Confiamos no provedor.
    */
   const numeroReal = verificacao.numero ? normalizarE164(verificacao.numero) : null;
-  const numeroFinal = numeroReal ?? numero;
+  const numeroFinal = numeroReal ?? numeroDigitado;
+
+  if (!numeroFinal) {
+    throw new CredencialInvalidaError("Número de WhatsApp inválido", "numero");
+  }
+
+  // Se não deu para checar o limite antes (número digitado não reconhecido),
+  // checa agora com o número que o provedor confirmou.
+  if (!numeroDigitado) {
+    const painel = await listarConexoes();
+    const jaExiste = painel.conexoes.some((c) => c.numero === numeroFinal);
+    if (!jaExiste && painel.disponiveis === 0) {
+      throw new LimiteConexoesError(painel.totais);
+    }
+  }
 
   const salvo = await comOrg(ctx.orgId, async (tx) => {
     const r = await salvarCanal(tx, {
