@@ -48,7 +48,7 @@ export function FormCadastro() {
       </Campo>
       <Campo
         label="WhatsApp"
-        dica="Usamos para te avisar de novidades da conta."
+        dica="Usamos para te avisar de novidades da conta. Fora do Brasil, digite com + e o código do país."
         erro={erroDe(estado, "telefone")}
       >
         <Input

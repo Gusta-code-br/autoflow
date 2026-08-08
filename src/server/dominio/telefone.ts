@@ -25,14 +25,26 @@ export function normalizarE164(
 ): string | null {
   if (!entrada) return null;
 
+  // Sinal explícito de "isto já é um número internacional completo": o
+  // usuário digitou o '+'. Sem isso não dá para distinguir, por exemplo, um
+  // celular português de 11 dígitos de um DDD+celular brasileiro também de
+  // 11 dígitos — o '+' tira a ambiguidade e evita tentar decifrar DDD de
+  // outro país como se fosse daqui.
+  const internacionalExplicito = entrada.trim().startsWith("+");
+
   let d = entrada.replace(/\D/g, "");
   if (!d) return null;
 
   // 00 como prefixo internacional discado
   if (d.startsWith("00")) d = d.slice(2);
 
-  // Número já internacional de outro país: aceita como veio.
-  if (!d.startsWith(paisPadrao) && d.length > 11) {
+  // Número de outro país: com '+' explícito, ou sem ele mas claramente maior
+  // que um número nacional (>11 dígitos e não começa com o código do país
+  // padrão). Aceita como veio, sem tentar aplicar regra de DDD/9º dígito.
+  if (
+    !d.startsWith(paisPadrao) &&
+    (internacionalExplicito || d.length > 11)
+  ) {
     return d.length >= 8 && d.length <= 15 ? `+${d}` : null;
   }
 

@@ -209,13 +209,14 @@ function FormularioManual({
             </Campo>
             <Campo
               label="Número com DDD"
+              dica="Fora do Brasil? Digite com + e o código do país, ex: +1 202 555 0143."
               obrigatorio
               erro={erroDe(estado, "numero")}
             >
               <Input
                 name="numero"
                 inputMode="tel"
-                placeholder="(11) 98888-7777"
+                placeholder="(11) 98888-7777 ou +1 202 555 0143"
                 defaultValue={valorDe(estado, "numero")}
                 required
               />

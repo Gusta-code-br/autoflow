@@ -87,6 +87,7 @@ export function BotaoNovo({
             </Campo>
             <Campo
               label="WhatsApp"
+              dica="Cliente de fora do Brasil? Digite com + e o código do país."
               obrigatorio
               erro={erroDe(estado, "contatoTelefone")}
             >

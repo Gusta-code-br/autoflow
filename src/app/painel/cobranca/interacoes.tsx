@@ -97,7 +97,7 @@ export function BotaoNovaCobranca({
               <Campo
                 label="WhatsApp"
                 obrigatorio
-                dica="É para onde a cobrança vai."
+                dica="É para onde a cobrança vai. Fora do Brasil? Digite com + e o código do país."
                 erro={erroDe(estado, "telefone")}
               >
                 <Input

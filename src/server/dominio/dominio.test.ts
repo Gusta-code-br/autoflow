@@ -141,6 +141,20 @@ describe("telefone", () => {
     assert.equal(normalizarE164("2099123-4501"), null);
   });
 
+  it("aceita número de outro país quando vem com '+' explícito", () => {
+    // Sem o '+' esses mesmos dígitos seriam ambíguos com um número
+    // brasileiro (11 dígitos, começa com algo que parece DDD válido).
+    assert.equal(normalizarE164("+1 202 555 0143"), "+12025550143");
+    assert.equal(normalizarE164("+351 912 345 678"), "+351912345678");
+    assert.equal(normalizarE164("+44 20 7946 0958"), "+442079460958");
+  });
+
+  it("sem '+', número curto de outro país cai na regra de DDD e é recusado", () => {
+    // Isso é esperado, não um bug: sem o '+' não há como saber que não é
+    // um número nacional. A UI deve orientar o uso do '+' + código do país.
+    assert.equal(normalizarE164("2025550143"), null);
+  });
+
   it("formata para exibição", () => {
     assert.equal(formatarTelefoneBR("+5511991234501"), "(11) 99123-4501");
     assert.equal(formatarTelefoneBR("+551132145678"), "(11) 3214-5678");
