@@ -93,6 +93,13 @@ export async function salvarConfigAction(
   if (form.has("objetivos")) bruto.objetivos = lista(form, "objetivos");
   if (form.has("diasSemana")) bruto.diasSemana = listaDeNumeros(form, "diasSemana");
 
+  // Campo em branco significa "manter a chave atual" (ver dica na UI) — só
+  // manda pra DAL quando o admin realmente digitou uma chave nova.
+  if (form.has("openaiApiKey")) {
+    const chave = texto(form, "openaiApiKey");
+    if (chave) bruto.openaiApiKey = chave;
+  }
+
   // Checkbox desmarcado não aparece no FormData — por isso o campo espelho
   // `<input type="hidden" name="notificar">` marca quais vieram na tela. Sem
   // isso, desmarcar uma notificação seria indistinguível de não mandá-la.

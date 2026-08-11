@@ -101,8 +101,6 @@ async function reservarLote(limite: number): Promise<DisparoReservado[]> {
          WHERE d.status = 'agendado'
            AND d.executar_em <= now()
            AND ex.status = 'ativa'
-           -- sem crédito não adianta reservar: ficaria preso no débito
-           AND o.saldo_creditos > 0
          ORDER BY d.executar_em
          LIMIT ${limite}
          FOR UPDATE OF d SKIP LOCKED
@@ -387,14 +385,6 @@ async function confirmarEnvio(
          SET tentativas = tentativas + 1, ultimo_envio_em = now(),
              atualizado_em = now()
        WHERE id = ${d.cobranca_id}
-    `;
-
-    // Ledger: o trigger tg_movimento_credito debita o saldo e recusa negativo.
-    await tx`
-      INSERT INTO movimento_credito (org_id, tipo, quantidade, saldo_apos,
-                                     origem_tipo, origem_id, idempotencia)
-      VALUES (${d.org_id}, 'consumo', -1, 0, 'disparo', ${d.id},
-              ${`disparo:${d.id}`})
     `;
 
     await tx`

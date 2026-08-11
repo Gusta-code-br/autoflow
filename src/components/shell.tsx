@@ -6,11 +6,10 @@ import { useState, type ReactNode } from "react";
 
 import { sairAction } from "@/server/actions/auth";
 import { planoMinimoPara } from "@/lib/plans";
-import { numero } from "@/lib/format";
 import type { FeatureKey } from "@/lib/types";
 import type { SessaoPainel } from "@/server/dal/painel";
 import { Icon, Logo, type IconName } from "./icons";
-import { Badge, Barra, Botao } from "./ui";
+import { Badge, Botao } from "./ui";
 import { cx } from "@/lib/cx";
 
 /**
@@ -106,7 +105,7 @@ function Sidebar({
   aoNavegar: () => void;
 }) {
   const pathname = usePathname();
-  const { creditos, plano } = sessao;
+  const { plano } = sessao;
 
   return (
     <aside
@@ -182,40 +181,6 @@ function Sidebar({
         ))}
       </nav>
 
-      {/* Atendente não decide compra: mostrar saldo e link de recarga a ele só
-          gera pedido de upgrade que ele não pode fazer. */}
-      {sessao.verFinanceiro && (
-        <div className="border-t border-ink-100 p-3">
-          <Link
-            href="/painel/creditos"
-            className="block rounded-xl bg-ink-50 p-3.5 transition-colors hover:bg-ink-100"
-          >
-            <div className="flex items-center justify-between text-[13px]">
-              <span className="font-medium text-ink-700">Créditos de IA</span>
-              <span className="text-ink-500">{creditos.percentual}%</span>
-            </div>
-            <Barra
-              valor={creditos.percentual}
-              tom={
-                creditos.percentual > 90
-                  ? "perigo"
-                  : creditos.percentual > 70
-                    ? "aviso"
-                    : "marca"
-              }
-              className="mt-2"
-            />
-            <p className="mt-2 text-xs text-ink-500">
-              {numero(creditos.restantes)} de {numero(creditos.totais)} mensagens
-            </p>
-            {creditos.percentual > 70 && (
-              <p className="mt-1.5 text-xs font-medium text-brand-700">
-                Recarregar créditos →
-              </p>
-            )}
-          </Link>
-        </div>
-      )}
     </aside>
   );
 }

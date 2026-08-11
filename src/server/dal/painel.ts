@@ -35,13 +35,6 @@ export interface SessaoPainel {
     status: string | null;
     expiraEm: Date | null;
   };
-  creditos: {
-    totais: number;
-    usados: number;
-    restantes: number;
-    /** 0–100, já arredondado e limitado — a UI só desenha a barra. */
-    percentual: number;
-  };
   conexoes: { conectadas: number; totais: number; comProblema: number };
   naoLidas: number;
   /** Atendente não vê preço, fatura nem saldo. */
@@ -51,17 +44,13 @@ export interface SessaoPainel {
 interface LinhaSessao {
   nome_atendente: string;
   fuso: string;
-  saldo_creditos: string;
   plano_id: string | null;
   plano_nome: string | null;
   features: Feature[] | null;
-  creditos_mes: number | null;
   conexoes_inclusas: number | null;
   conexoes_extras: number | null;
   status_assinatura: string | null;
   expira_em: Date | null;
-  comprados_ciclo: string;
-  usados_ciclo: string;
   conexoes_conectadas: number;
   conexoes_problema: number;
   nao_lidas: string;
@@ -75,39 +64,17 @@ export async function carregarSessaoPainel(): Promise<SessaoPainel> {
      * Uma consulta só. Os subselects são todos por índice e sobre a partição da
      * própria organização (RLS já filtrou), então sai mais barato que abrir seis
      * transações — o custo aqui é dominado por round-trip, não por CPU.
-     *
-     * O ciclo de crédito fecha no primeiro dia do mês *no fuso da empresa*: é o
-     * que o cliente vê no extrato, e é como `mensagens_mes` já contava em
-     * conexões. Duas contagens com corte diferente na mesma tela é bug de
-     * confiança.
      */
     const [l] = await tx<LinhaSessao[]>`
-      WITH ciclo AS (
-        SELECT date_trunc('month', now() AT TIME ZONE o.fuso) AT TIME ZONE o.fuso AS inicio
-          FROM organizacao o WHERE o.id = ${ctx.orgId}
-      )
       SELECT o.nome_atendente,
              o.fuso,
-             o.saldo_creditos,
              p.id                AS plano_id,
              p.nome              AS plano_nome,
              p.features,
-             p.creditos_mes,
              p.conexoes_inclusas,
              a.conexoes_extras,
              a.status            AS status_assinatura,
              a.expira_em,
-             COALESCE((
-               SELECT sum(mc.quantidade) FROM movimento_credito mc, ciclo
-                WHERE mc.quantidade > 0
-                  AND mc.origem_tipo = 'pagamento'
-                  AND mc.criado_em >= ciclo.inicio
-             ), 0) AS comprados_ciclo,
-             COALESCE((
-               SELECT -sum(mc.quantidade) FROM movimento_credito mc, ciclo
-                WHERE mc.quantidade < 0
-                  AND mc.criado_em >= ciclo.inicio
-             ), 0) AS usados_ciclo,
              COALESCE((
                SELECT count(*) FROM canal_whatsapp c WHERE c.status = 'conectado'
              ), 0)::int AS conexoes_conectadas,
@@ -127,11 +94,6 @@ export async function carregarSessaoPainel(): Promise<SessaoPainel> {
        ORDER BY a.criado_em DESC NULLS LAST
        LIMIT 1
     `;
-
-    const comprados = Number(l.comprados_ciclo);
-    const totais = (l.creditos_mes ?? 0) + comprados;
-    const usados = Number(l.usados_ciclo);
-    const restantes = Number(l.saldo_creditos);
 
     return {
       usuario: {
@@ -153,13 +115,6 @@ export async function carregarSessaoPainel(): Promise<SessaoPainel> {
         features: l.features ?? ["atendimento"],
         status: l.status_assinatura,
         expiraEm: l.expira_em,
-      },
-      creditos: {
-        totais,
-        usados,
-        restantes,
-        // Sem plano ainda: 0% é mais honesto que dividir por zero e mostrar NaN.
-        percentual: totais > 0 ? Math.min(100, Math.round((usados / totais) * 100)) : 0,
       },
       conexoes: {
         conectadas: l.conexoes_conectadas,

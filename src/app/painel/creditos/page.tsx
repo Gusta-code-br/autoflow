@@ -2,22 +2,21 @@ import Link from "next/link";
 
 import { Icon, type IconName } from "@/components/icons";
 import { Pagina } from "@/components/shell";
-import { Badge, Barra, Card, CardTitulo, Vazio } from "@/components/ui";
+import { Badge, Card, CardTitulo, Vazio } from "@/components/ui";
 import { cx } from "@/lib/cx";
-import { brl, dataLonga, numero } from "@/lib/format";
+import { brl, dataLonga } from "@/lib/format";
 import { painelCreditos, type FaturaDTO } from "@/server/dal/creditos";
 import { carregarSessaoPainel } from "@/server/dal/painel";
 import { centavosParaReais } from "@/server/dominio/dinheiro";
-import { BotaoMudarPlano, PacotesRecarga, SwitchRenovacao } from "./interacoes";
+import { BotaoMudarPlano, SwitchRenovacao } from "./interacoes";
 
 /**
- * Plano, créditos e faturas.
+ * Plano e faturas.
  *
- * Server Component: assinatura, consumo e histórico saem do banco com RLS
- * ligado. O protótipo lia `app.conta` do localStorage e as constantes de
- * `lib/plans`, então mostrava um plano Profissional para todo mundo e
- * "creditava" mensagens no clique — aqui o catálogo vem das tabelas `plano`,
- * `plano_preco` e `pacote_credito`, e crédito só entra por webhook pago.
+ * Server Component: assinatura e histórico saem do banco com RLS ligado. O
+ * protótipo lia `app.conta` do localStorage e as constantes de `lib/plans`,
+ * então mostrava um plano Profissional para todo mundo — aqui o catálogo vem
+ * das tabelas `plano` e `plano_preco`, e o pagamento só entra por webhook.
  */
 export default async function CreditosPage({
   searchParams,
@@ -33,12 +32,12 @@ export default async function CreditosPage({
    */
   if (!sessao.verFinanceiro) {
     return (
-      <Pagina titulo="Plano e créditos">
+      <Pagina titulo="Plano e faturas">
         <Card>
           <Vazio
             icone="lock"
             titulo="Somente administradores"
-            descricao="Plano, faturas e recarga de créditos ficam com quem administra a conta. Peça a quem te convidou se precisar de mais mensagens."
+            descricao="Plano e faturas ficam com quem administra a conta. Peça a quem te convidou se precisar de mudar algo."
           />
         </Card>
       </Pagina>
@@ -49,15 +48,14 @@ export default async function CreditosPage({
   const planoSugerido =
     typeof planoQuery === "string" ? planoQuery : (planoQuery?.[0] ?? null);
 
-  const { assinatura, consumo, faturas, catalogo, precoConexaoExtra, pacotes } =
-    await painelCreditos();
+  const { assinatura, faturas, catalogo, precoConexaoExtra } = await painelCreditos();
 
   const planoAtual = catalogo.find((p) => p.id === assinatura.planoId) ?? null;
 
   return (
     <Pagina
-      titulo="Plano e créditos"
-      descricao="Sua assinatura, o consumo de mensagens de IA e o histórico de pagamentos."
+      titulo="Plano e faturas"
+      descricao="Sua assinatura e o histórico de pagamentos."
     >
       <div className="space-y-6">
         <Card>
@@ -179,82 +177,6 @@ export default async function CreditosPage({
 
         <Card>
           <CardTitulo
-            titulo="Créditos de IA"
-            subtitulo="Cada resposta da IA consome 1 crédito; sua cota renova todo mês e você pode recarregar quando quiser."
-          />
-          <div className="space-y-6 p-5">
-            <div>
-              <div className="flex items-baseline justify-between text-sm">
-                <span className="font-medium text-ink-800">
-                  {numero(consumo.restantes)} restantes
-                </span>
-                <span className="text-ink-500">
-                  {consumo.percentual}% usado este mês
-                </span>
-              </div>
-              <Barra
-                valor={consumo.percentual}
-                tom={
-                  consumo.percentual > 90
-                    ? "perigo"
-                    : consumo.percentual > 70
-                      ? "aviso"
-                      : "marca"
-                }
-                className="mt-2"
-              />
-
-              {consumo.usados > 0 && (
-                <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-                  <QuebraModulo
-                    nome="Atendimento"
-                    valor={consumo.porFeature.atendimento}
-                    total={consumo.usados}
-                    cor="bg-brand-500"
-                  />
-                  <QuebraModulo
-                    nome="Cobrança"
-                    valor={consumo.porFeature.cobranca}
-                    total={consumo.usados}
-                    cor="bg-amber-400"
-                  />
-                  <QuebraModulo
-                    nome="Agendamento"
-                    valor={consumo.porFeature.agendamento}
-                    total={consumo.usados}
-                    cor="bg-sky-400"
-                  />
-                </div>
-              )}
-
-              {/*
-               * Projeção com o ritmo real do ciclo. Sem isso o cliente só
-               * descobre que acabou quando a IA para de responder.
-               */}
-              {consumo.diasRestantes !== null && (
-                <p
-                  className={cx(
-                    "mt-3 text-[13px]",
-                    consumo.diasRestantes <= 5 ? "text-amber-700" : "text-ink-500",
-                  )}
-                >
-                  No ritmo de {numero(Math.round(consumo.mediaDiaria))} mensagens
-                  por dia, o saldo dura mais{" "}
-                  <strong className="font-medium">
-                    {consumo.diasRestantes}{" "}
-                    {consumo.diasRestantes === 1 ? "dia" : "dias"}
-                  </strong>
-                  .
-                </p>
-              )}
-            </div>
-
-            <PacotesRecarga pacotes={pacotes} />
-          </div>
-        </Card>
-
-        <Card>
-          <CardTitulo
             titulo="Faturas"
             subtitulo="Histórico de pagamentos da sua conta"
           />
@@ -307,29 +229,6 @@ function StatusAssinatura({ status }: { status: string | null }) {
   if (status === "inadimplente") return <Badge tom="perigo">Em atraso</Badge>;
   if (status === "ativa") return <Badge tom="sucesso">Ativa</Badge>;
   return null;
-}
-
-function QuebraModulo({
-  nome,
-  valor,
-  total,
-  cor,
-}: {
-  nome: string;
-  valor: number;
-  total: number;
-  cor: string;
-}) {
-  const pct = total > 0 ? Math.round((valor / total) * 100) : 0;
-  return (
-    <div className="rounded-xl bg-ink-50 p-3">
-      <span className={cx("mx-auto mb-1.5 block size-2.5 rounded-full", cor)} />
-      <p className="text-sm font-semibold text-ink-900">{numero(valor)}</p>
-      <p className="text-[11px] text-ink-500">
-        {nome} · {pct}%
-      </p>
-    </div>
-  );
 }
 
 const TIPO_TOM: Record<string, "marca" | "info" | "neutro"> = {

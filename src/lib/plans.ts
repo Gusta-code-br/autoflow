@@ -1,11 +1,4 @@
-import type {
-  FeatureKey,
-  PacoteCredito,
-  Periodo,
-  PeriodoId,
-  PlanId,
-  Plano,
-} from "./types";
+import type { FeatureKey, Periodo, PeriodoId, PlanId, Plano } from "./types";
 
 export const PRECO_CONEXAO_EXTRA = 49;
 
@@ -40,12 +33,11 @@ export const PLANOS: Plano[] = [
     chamada: "Para quem só quer parar de perder mensagem.",
     precoMensal: 97,
     features: ["atendimento"],
-    creditosMes: 1000,
     conexoesInclusas: 1,
     beneficios: [
       "IA de atendimento 24/7 no WhatsApp",
       "1 número de WhatsApp conectado",
-      "1.000 mensagens de IA por mês",
+      "Sem limite de mensagens — você usa sua própria chave OpenAI",
       "Painel de conversas e histórico",
       "Assumir a conversa quando quiser",
     ],
@@ -56,14 +48,12 @@ export const PLANOS: Plano[] = [
     chamada: "Atende e ainda corre atrás do dinheiro por você.",
     precoMensal: 197,
     features: ["atendimento", "cobranca"],
-    creditosMes: 3000,
     conexoesInclusas: 1,
     destaque: true,
     beneficios: [
       "Tudo do Essencial",
       "Réguas de cobrança automáticas ilimitadas",
       "PIX automático dentro da mensagem",
-      "3.000 mensagens de IA por mês",
       "Relatório de recuperação de inadimplência",
     ],
   },
@@ -73,14 +63,12 @@ export const PLANOS: Plano[] = [
     chamada: "Atendimento, cobrança e agenda no automático.",
     precoMensal: 347,
     features: ["atendimento", "cobranca", "agendamento"],
-    creditosMes: 10000,
     conexoesInclusas: 2,
     beneficios: [
       "Tudo do Profissional",
       "Agendamento pela IA direto no WhatsApp",
       "Aviso no seu WhatsApp pessoal a cada novo agendamento",
       "2 números de WhatsApp inclusos",
-      "10.000 mensagens de IA por mês",
     ],
   },
 ];
@@ -95,12 +83,6 @@ export const PERIODOS: Periodo[] = [
     selo: "-15%",
   },
   { id: "anual", nome: "1 ano", meses: 12, desconto: 0.25, selo: "-25%" },
-];
-
-export const PACOTES_CREDITO: PacoteCredito[] = [
-  { id: "pac-1k", creditos: 1000, preco: 39 },
-  { id: "pac-5k", creditos: 5000, preco: 169, selo: "Mais vendido" },
-  { id: "pac-15k", creditos: 15000, preco: 449, selo: "Melhor custo" },
 ];
 
 export const SEGMENTOS = [

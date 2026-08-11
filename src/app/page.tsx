@@ -72,9 +72,9 @@ const FAQ = [
       "Sempre. Com um clique você tira a IA da conversa e responde pessoalmente. Quando quiser, devolve para a IA continuar.",
   },
   {
-    pergunta: "Como funcionam os créditos de mensagens de IA?",
+    pergunta: "As mensagens de IA têm limite?",
     resposta:
-      "Cada plano já inclui uma cota mensal de mensagens de IA. Se acabar antes do fim do mês, você recarrega com pacotes de créditos avulsos, sem trocar de plano.",
+      "Não. Você conecta sua própria chave da OpenAI nas configurações e o consumo é pago direto pra OpenAI, no seu próprio custo — sem cota mensal nem pacote de créditos pra recarregar.",
   },
 ];
 
@@ -315,8 +315,8 @@ export default function Home() {
                 Planos para todo tamanho de negócio
               </h2>
               <p className="mt-3 text-[15px] text-ink-500">
-                Cada plano já inclui uma cota mensal de mensagens de IA,
-                com recarga por pacote de créditos quando acabar.
+                Sem cota de mensagens: você usa sua própria chave da OpenAI e
+                paga só o que consumir, direto pra OpenAI.
               </p>
             </div>
 

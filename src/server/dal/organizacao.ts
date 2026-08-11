@@ -5,6 +5,7 @@ import { z } from "zod";
 import { sql, comOrg, type Transacao } from "@/server/db";
 import { conferirSenha, gerarHashSenha, precisaRehash, validarSenha } from "@/server/seguranca/senha";
 import { normalizarE164 } from "@/server/dominio/telefone";
+import { cifrar, versaoAtual } from "@/server/seguranca/cripto";
 import { exigirContexto, exigirPapel, type Contexto } from "./contexto";
 
 /**
@@ -302,7 +303,8 @@ export interface ConfigOrg {
   notificarSemResposta: boolean;
   chavePix: string | null;
   onboardingCompleto: boolean;
-  saldoCreditos: number;
+  /** Nunca devolve a chave em claro pro cliente — só se já tem uma salva. */
+  openaiChaveConfigurada: boolean;
 }
 
 export async function buscarConfig(): Promise<ConfigOrg> {
@@ -329,7 +331,7 @@ export async function buscarConfig(): Promise<ConfigOrg> {
         notificar_sem_resposta: boolean;
         chave_pix: string | null;
         onboarding_completo: boolean;
-        saldo_creditos: number;
+        openai_api_key_cif: string | null;
       }[]
     >`SELECT * FROM organizacao WHERE id = ${ctx.orgId}`;
 
@@ -353,7 +355,7 @@ export async function buscarConfig(): Promise<ConfigOrg> {
       notificarSemResposta: o.notificar_sem_resposta,
       chavePix: o.chave_pix,
       onboardingCompleto: o.onboarding_completo,
-      saldoCreditos: Number(o.saldo_creditos),
+      openaiChaveConfigurada: o.openai_api_key_cif !== null,
     };
   });
 }
@@ -415,6 +417,9 @@ export const EntradaConfig = EntradaOnboarding.partial().extend({
   notificarNovoAgendamento: z.boolean().optional(),
   notificarPagamento: z.boolean().optional(),
   notificarSemResposta: z.boolean().optional(),
+  // Vazio limpa a chave salva; ausente (campo não veio no form) não mexe nela —
+  // a mesma regra de "só grava o que veio" que o resto da EntradaConfig segue.
+  openaiApiKey: z.string().trim().max(200).optional(),
 });
 export type EntradaConfig = z.infer<typeof EntradaConfig>;
 
@@ -446,7 +451,13 @@ export async function salvarConfig(entrada: EntradaConfig): Promise<void> {
   def("notificarPagamento", "notificar_pagamento", entrada.notificarPagamento);
   def("notificarSemResposta", "notificar_sem_resposta", entrada.notificarSemResposta);
 
-  if (Object.keys(mapa).length === 0 && !entrada.horarioInicio && !entrada.horarioFim && !entrada.whatsappPessoal) {
+  if (
+    Object.keys(mapa).length === 0 &&
+    !entrada.horarioInicio &&
+    !entrada.horarioFim &&
+    !entrada.whatsappPessoal &&
+    entrada.openaiApiKey === undefined
+  ) {
     return;
   }
 
@@ -468,9 +479,20 @@ export async function salvarConfig(entrada: EntradaConfig): Promise<void> {
       const w = normalizarE164(entrada.whatsappPessoal);
       await tx`UPDATE organizacao SET whatsapp_pessoal = ${w} WHERE id = ${ctx.orgId}`;
     }
+    // Chave própria da OpenAI: cada organização paga o próprio consumo — não
+    // há fallback global no .env. String vazia limpa a chave salva.
+    if (entrada.openaiApiKey !== undefined) {
+      const cif = entrada.openaiApiKey
+        ? cifrar(entrada.openaiApiKey, `openai:${ctx.orgId}`)
+        : null;
+      await tx`UPDATE organizacao SET openai_api_key_cif = ${cif} WHERE id = ${ctx.orgId}`;
+    }
 
     await auditar(tx, ctx, "config.alterada", "organizacao", ctx.orgId, {
-      campos: Object.keys(mapa),
+      campos: [
+        ...Object.keys(mapa),
+        ...(entrada.openaiApiKey !== undefined ? ["openai_api_key_cif"] : []),
+      ],
     });
   });
 }

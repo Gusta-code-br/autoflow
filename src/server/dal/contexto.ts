@@ -157,6 +157,18 @@ export function podeVerFinanceiro(papel: Papel): boolean {
   return papel !== "atendente";
 }
 
+/**
+ * Quem pode editar as configurações da organização (`salvarConfigAction` →
+ * `salvarConfig`, que chama `exigirPapel("admin", ...)`). Dono sempre pode —
+ * é hierarquicamente acima de admin (ver `HIERARQUIA`) — por isso aqui não dá
+ * pra comparar `papel === "admin"` feito no resto do app: isso deixaria o
+ * próprio dono da organização sem conseguir editar nada, incluindo a chave da
+ * OpenAI.
+ */
+export function podeConfigurar(papel: Papel): boolean {
+  return papel !== "atendente";
+}
+
 export async function criarSessao(
   usuarioId: string,
   dados: { ip?: string | null; userAgent?: string | null } = {},

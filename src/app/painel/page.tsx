@@ -1,11 +1,11 @@
 import Link from "next/link";
 
 import { Pagina } from "@/components/shell";
-import { Barra, Botao, Card, CardTitulo, Vazio } from "@/components/ui";
+import { Botao, Card, CardTitulo, Vazio } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { FlashToast } from "@/components/toast";
 import { Icon, type IconName } from "@/components/icons";
-import { brl, dataLonga, numero, tempoRelativo } from "@/lib/format";
+import { brl, numero, tempoRelativo } from "@/lib/format";
 import {
   carregarSessaoPainel,
   resumoPainel,
@@ -53,23 +53,6 @@ export default async function PainelPage({
   );
   const saudacao =
     horaLocal < 12 ? "Bom dia" : horaLocal < 18 ? "Boa tarde" : "Boa noite";
-
-  /*
-   * Projeção de duração dos créditos pela média dos 14 dias — a mesma janela do
-   * gráfico logo acima, para o texto não contradizer o desenho.
-   */
-  const mediaDiaria = uso.length
-    ? uso.reduce(
-        (s, u) => s + u.atendimento + u.cobranca + u.agendamento,
-        0,
-      ) / uso.length
-    : 0;
-  const diasRestantes =
-    mediaDiaria > 0 ? Math.floor(sessao.creditos.restantes / mediaDiaria) : null;
-  const dataProjetada =
-    diasRestantes !== null
-      ? new Date(agora.getTime() + diasRestantes * 86400000).toISOString()
-      : null;
 
   return (
     <Pagina
@@ -188,49 +171,6 @@ export default async function PainelPage({
         </div>
 
         <div className="space-y-6">
-          <Card>
-            <CardTitulo titulo="Créditos de IA" subtitulo="Sua cota deste mês" />
-            <div className="p-5">
-              <div className="flex items-baseline justify-between text-sm">
-                <span className="font-medium text-ink-800">
-                  {numero(sessao.creditos.restantes)} restantes
-                </span>
-                <span className="text-ink-500">
-                  de {numero(sessao.creditos.totais)}
-                </span>
-              </div>
-              <Barra
-                valor={sessao.creditos.percentual}
-                tom={
-                  sessao.creditos.percentual > 90
-                    ? "perigo"
-                    : sessao.creditos.percentual > 70
-                      ? "aviso"
-                      : "marca"
-                }
-                className="mt-2.5"
-              />
-              <p className="mt-3 text-[13px] leading-relaxed text-ink-500">
-                {sessao.creditos.restantes === 0
-                  ? "Seus créditos acabaram. Recarregue para a IA continuar respondendo."
-                  : dataProjetada
-                    ? `No ritmo atual, seus créditos duram até ${dataLonga(dataProjetada)}.`
-                    : "Ainda não há uso suficiente para projetar a duração dos créditos."}
-              </p>
-              {sessao.verFinanceiro && (
-                <Link href="/painel/creditos" className="mt-4 block">
-                  <Botao
-                    variante="secundario"
-                    className="w-full"
-                    iconeDireita="arrowRight"
-                  >
-                    Ver plano e créditos
-                  </Botao>
-                </Link>
-              )}
-            </div>
-          </Card>
-
           <Card>
             <CardTitulo
               titulo="Precisa de você"

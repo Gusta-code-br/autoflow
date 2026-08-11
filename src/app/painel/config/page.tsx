@@ -1,4 +1,5 @@
 import { Pagina } from "@/components/shell";
+import { podeConfigurar } from "@/server/dal/contexto";
 import { buscarConfig } from "@/server/dal/organizacao";
 import { carregarSessaoPainel } from "@/server/dal/painel";
 import { Formularios } from "./formularios";
@@ -25,7 +26,7 @@ export default async function ConfigPage() {
       <Formularios
         config={config}
         email={sessao.usuario.email}
-        admin={sessao.usuario.papel === "admin"}
+        admin={podeConfigurar(sessao.usuario.papel)}
         verFinanceiro={sessao.verFinanceiro}
         plano={{
           nome: sessao.plano.nome,

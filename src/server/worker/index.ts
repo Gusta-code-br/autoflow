@@ -5,6 +5,11 @@ import { canalReal } from "../canais/fabrica";
 import { limparAntigos } from "../seguranca/limite";
 import { processarLote, recuperarTravados, type ResultadoLote } from "./disparos";
 import {
+  processarLoteIA,
+  recuperarTarefasTravadas,
+  type ResultadoLoteIA,
+} from "./ia";
+import {
   limparEventosAntigos,
   limparSessoesExpiradas,
   reprocessarEventos,
@@ -73,6 +78,27 @@ async function cicloDeDisparos(maxLotes = 8): Promise<ResultadoLote> {
   return total;
 }
 
+/** Mesmo dreno de `cicloDeDisparos`, para a fila de respostas de IA. */
+async function cicloDeRespostasIA(maxLotes = 8): Promise<ResultadoLoteIA> {
+  const total: ResultadoLoteIA = {
+    reservadas: 0,
+    respondidas: 0,
+    ignoradas: 0,
+    falhas: 0,
+  };
+
+  for (let i = 0; i < maxLotes; i++) {
+    const r = await processarLoteIA();
+    total.reservadas += r.reservadas;
+    total.respondidas += r.respondidas;
+    total.ignoradas += r.ignoradas;
+    total.falhas += r.falhas;
+    if (r.reservadas === 0) break;
+  }
+
+  return total;
+}
+
 function interessante(valor: unknown): boolean {
   if (typeof valor === "number") return valor > 0;
   if (valor && typeof valor === "object") {
@@ -110,6 +136,10 @@ function tarefas(): Tarefa[] {
     nova("disparos", 5 * SEGUNDO, () => cicloDeDisparos()),
     // Reserva órfã de um deploy no meio do lote volta para 'agendado'.
     nova("travados", MINUTO, () => recuperarTravados()),
+    // Respostas automáticas de IA.
+    nova("ia", 5 * SEGUNDO, () => cicloDeRespostasIA()),
+    // Idem, para a fila genérica `tarefa` (hoje só 'responder_ia').
+    nova("tarefas-travadas", MINUTO, () => recuperarTarefasTravadas()),
     // Webhook que chegou e não processou.
     nova("eventos", MINUTO, () => reprocessarEventos()),
     // Higiene: nada disso é urgente, mas ninguém faz se o worker não fizer.

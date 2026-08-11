@@ -148,7 +148,13 @@ export const cloudApi: Provedor = {
 
       if (resp.status >= 400) {
         const c = classificar(resp.status, json);
-        return { ok: false as const, erro: c.erro, codigo: c.codigo };
+        // 401 = token recusado; 404 = phone_number_id não existe pra esse
+        // token. `codigo` casa com o `name` do input no formulário de conexão
+        // aqui (diferente de `enviarTexto`/`enviarTemplate`, onde `codigo`
+        // decide retry — por isso o mapeamento fica só neste método).
+        const campo =
+          resp.status === 401 ? "token" : resp.status === 404 ? "phoneNumberId" : undefined;
+        return { ok: false as const, erro: c.erro, codigo: campo ?? c.codigo };
       }
 
       return {

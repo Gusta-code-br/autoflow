@@ -8,23 +8,22 @@ import { AvisoForm, BotaoEnviar } from "@/components/form";
 import { Icon } from "@/components/icons";
 import { Badge, Botao, Modal, Switch } from "@/components/ui";
 import { cx } from "@/lib/cx";
-import { brl, numero } from "@/lib/format";
+import { brl } from "@/lib/format";
 import { ESTADO_INICIAL } from "@/lib/form";
 import {
-  comprarPacoteAction,
   contratarPlanoAction,
   definirRenovacaoAction,
 } from "@/server/actions/creditos";
-import type { PacoteCatalogo, PlanoCatalogo } from "@/server/dal/creditos";
+import type { PlanoCatalogo } from "@/server/dal/creditos";
 import { centavosParaReais } from "@/server/dominio/dinheiro";
 
 /**
- * As partes de Plano e créditos que precisam de browser.
+ * As partes de Plano que precisam de browser.
  *
- * O protótipo trocava o plano no clique (`app.assinar`) e creditava mensagens
- * na hora (`app.comprarCreditos`). Aqui nenhuma das duas coisas acontece: as
- * ações criam um pagamento pendente e quem libera é o webhook do provedor.
- * Por isso o sucesso não fecha o modal — ele mostra que falta pagar o PIX.
+ * O protótipo trocava o plano no clique (`app.assinar`), sem pagamento de
+ * verdade. Aqui a ação cria um pagamento pendente e quem libera é o webhook
+ * do provedor — por isso o sucesso não fecha o modal, ele mostra que falta
+ * pagar o PIX.
  */
 
 const NOME_PERIODO: Record<string, string> = {
@@ -237,9 +236,6 @@ function ModalMudarPlano({
                     {brl(centavosParaReais(pr.precoMensalEquivalente))}
                     <span className="text-xs font-normal text-ink-500">/mês</span>
                   </p>
-                  <p className="mt-1 text-xs text-ink-500">
-                    {numero(p.creditosMes)} mensagens/mês
-                  </p>
                   {p.chamada && (
                     <p className="mt-2 text-xs leading-relaxed text-ink-500">
                       {p.chamada}
@@ -340,79 +336,5 @@ function ControleRenovacao({
       label="Renovação automática"
       descricao="Desligando, seu acesso continua até o fim do período já pago e nada é cobrado depois."
     />
-  );
-}
-
-/* --------------------------------------------------------- Pacotes de IA */
-
-export function PacotesRecarga({ pacotes }: { pacotes: PacoteCatalogo[] }) {
-  /*
-   * Um `useActionState` para os três cards: o aviso de "PIX criado" aparece uma
-   * vez só, em vez de três áreas de mensagem competindo pela mesma tela.
-   */
-  const [estado, acao] = useActionState(comprarPacoteAction, ESTADO_INICIAL);
-
-  return (
-    <div>
-      <p className="mb-3 text-[13px] font-medium text-ink-700">
-        Pacotes de recarga
-      </p>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {pacotes.map((pac) => {
-          const reais = centavosParaReais(pac.preco);
-          const porMensagem = reais / pac.creditos;
-          return (
-            <form
-              action={acao}
-              key={pac.id}
-              className="flex flex-col rounded-2xl border border-ink-200 p-4"
-            >
-              <input type="hidden" name="pacoteId" value={pac.id} />
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-ink-900">
-                  {numero(pac.creditos)} mensagens
-                </span>
-                {pac.selo && <Badge tom="marca">{pac.selo}</Badge>}
-              </div>
-              <p className="mt-2 text-xl font-semibold text-ink-900">
-                {brl(reais)}
-              </p>
-              <p className="text-xs text-ink-500">
-                {porMensagem.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                  minimumFractionDigits: 3,
-                  maximumFractionDigits: 3,
-                })}{" "}
-                por mensagem
-              </p>
-              <div className="mt-3">
-                <BotaoEnviar
-                  variante="zap"
-                  tamanho="sm"
-                  icone="pix"
-                  className="w-full"
-                  enviando="Gerando PIX..."
-                >
-                  Comprar com PIX
-                </BotaoEnviar>
-              </div>
-            </form>
-          );
-        })}
-      </div>
-      <div className="mt-3">
-        <AvisoForm estado={estado} />
-      </div>
-      {estado.ok && (
-        <div className="mt-2 space-y-2">
-          <p className="text-xs text-ink-500">
-            Os créditos entram na conta assim que o pagamento for confirmado — a
-            fatura aparece na lista abaixo como pendente até lá.
-          </p>
-          <LinkPagamento pagamentoId={estado.valores?.pagamentoId} />
-        </div>
-      )}
-    </div>
   );
 }

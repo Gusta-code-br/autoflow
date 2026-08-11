@@ -181,6 +181,32 @@ function AbaAtendente({ config, admin }: { config: ConfigOrg; admin: boolean }) 
 
         <Card>
           <CardTitulo
+            titulo="Chave da OpenAI (ChatGPT)"
+            subtitulo="Cada organização paga o próprio consumo direto na OpenAI — sem custo extra aqui."
+          />
+          <div className="space-y-3 p-5">
+            <Campo
+              label="Chave da API"
+              erro={erroDe(estado, "openaiApiKey")}
+              dica={
+                config.openaiChaveConfigurada
+                  ? "Chave configurada. Deixe em branco para manter a atual, ou digite uma nova para substituir."
+                  : "Sem chave configurada, a IA não consegue responder aos clientes."
+              }
+            >
+              <Input
+                name="openaiApiKey"
+                type="password"
+                autoComplete="off"
+                placeholder={config.openaiChaveConfigurada ? "••••••••••••••••" : "sk-..."}
+              />
+            </Campo>
+          </div>
+          <Rodape admin={admin} />
+        </Card>
+
+        <Card>
+          <CardTitulo
             titulo="Horário de atendimento"
             subtitulo="Fora dele a IA avisa quando você volta e nenhuma cobrança é disparada."
           />

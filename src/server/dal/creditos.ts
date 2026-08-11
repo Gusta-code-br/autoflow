@@ -498,45 +498,6 @@ export interface CobrancaPix {
 }
 
 /**
- * Registra a intenção de compra de um pacote de créditos.
- *
- * Não credita nada: quem credita é o webhook de pagamento aprovado, com
- * `idempotencia` própria. Crédito liberado no clique é crédito de graça para
- * quem fecha o navegador antes de pagar.
- */
-export async function comprarPacote(pacoteId: string): Promise<CobrancaPix> {
-  const ctx = await exigirPapel("admin", "comprar créditos");
-
-  const [pacote] = await sql<{ id: string; creditos: number; preco: string }[]>`
-    SELECT id, creditos, preco FROM pacote_credito
-     WHERE id = ${pacoteId} AND ativo
-  `;
-  if (!pacote) throw new Error("Pacote indisponível.");
-
-  return comOrg(ctx.orgId, async (tx) => {
-    const [pagamento] = await tx<
-      { id: string; expira_em: Date | null }[]
-    >`
-      INSERT INTO pagamento (org_id, tipo, descricao, valor, metodo, status,
-                             pacote_id, expira_em)
-      VALUES (${ctx.orgId}, 'creditos',
-              ${`Pacote de ${pacote.creditos.toLocaleString("pt-BR")} créditos`},
-              ${pacote.preco}, 'pix', 'pendente', ${pacote.id},
-              now() + interval '30 minutes')
-      RETURNING id, expira_em
-    `;
-
-    return {
-      pagamentoId: pagamento.id,
-      valor: centavos(pacote.preco),
-      pixCopiaCola: null,
-      qrBase64: null,
-      expiraEm: pagamento.expira_em,
-    };
-  });
-}
-
-/**
  * Registra a intenção de assinar/trocar de plano.
  *
  * Também não muda a assinatura: cria o pagamento pendente e espera o webhook.

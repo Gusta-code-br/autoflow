@@ -10,7 +10,6 @@ export interface Plano {
   chamada: string;
   precoMensal: number;
   features: FeatureKey[];
-  creditosMes: number;
   conexoesInclusas: number;
   destaque?: boolean;
   beneficios: string[];
@@ -21,13 +20,6 @@ export interface Periodo {
   nome: string;
   meses: number;
   desconto: number; // 0..1
-  selo?: string;
-}
-
-export interface PacoteCredito {
-  id: string;
-  creditos: number;
-  preco: number;
   selo?: string;
 }
 

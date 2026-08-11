@@ -29,7 +29,7 @@
                                 │ HTTPS
         ┌───────────────────────┼────────────────────────┐
         ▼                       ▼                        ▼
-  Meta Cloud API         Mercado Pago              Anthropic / OpenAI
+  Meta Cloud API         Mercado Pago              OpenAI (ChatGPT)
   (WhatsApp Business)    (assinatura + PIX)        (IA de atendimento)
 ```
 

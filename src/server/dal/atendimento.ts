@@ -598,17 +598,6 @@ export async function responderConversa(
              enviada_em = now()
        WHERE id = ${preparo.mensagemId}
     `;
-    // O trigger tg_movimento_credito debita o saldo e recusa saldo negativo.
-    // Se recusar, a mensagem já saiu — por isso a resposta humana debita
-    // *depois* e não bloqueia: cobrar um crédito é menos grave do que deixar o
-    // atendente mudo com o cliente esperando.
-    await tx`
-      INSERT INTO movimento_credito (org_id, tipo, quantidade, saldo_apos,
-                                     origem_tipo, origem_id, idempotencia)
-      VALUES (${ctx.orgId}, 'consumo', -1, 0, 'mensagem',
-              ${preparo.mensagemId}, ${`mensagem:${preparo.mensagemId}`})
-      ON CONFLICT (org_id, idempotencia) DO NOTHING
-    `;
   });
 
   return { ok: true, mensagemId: preparo.mensagemId };

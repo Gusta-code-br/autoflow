@@ -24,6 +24,7 @@ const TIMEOUT_MS = 15_000;
 interface RespostaEvolution {
   key?: { id?: string };
   error?: string;
+  message?: string | string[];
   response?: { message?: string | string[] };
 }
 
@@ -31,10 +32,26 @@ function destino(e164: string): string {
   return e164.replace(/\D/g, "");
 }
 
+// Instâncias self-hosted de clientes diferentes rodam versões diferentes da
+// Evolution API, e cada uma devolve erro num formato ligeiramente distinto
+// (v2 costuma aninhar em `response.message`, outras mandam `message` ou
+// `error` na raiz). Tenta todos antes de cair no HTTP genérico, senão o
+// cliente só vê "HTTP 400" sem saber o que corrigir.
 function mensagemDeErro(json: RespostaEvolution, status: number): string {
-  const m = json.response?.message;
-  if (Array.isArray(m)) return m.join("; ");
-  return String(m ?? json.error ?? `HTTP ${status}`);
+  const candidatos = [json.response?.message, json.message, json.error];
+  for (const c of candidatos) {
+    if (Array.isArray(c) && c.length > 0) return c.map(String).join("; ");
+    if (typeof c === "string" && c.trim()) return c;
+  }
+  return `HTTP ${status}`;
+}
+
+// Erro comum de configuração: o cliente cola a URL do painel web da Evolution
+// (que costuma terminar em `/manager`) em vez da URL raiz da API. Normaliza
+// para não gerar rotas do tipo `/manager/message/sendText/...`, que não
+// existem.
+function normalizarBaseUrl(baseUrl: string): string {
+  return baseUrl.trim().replace(/\/+$/, "").replace(/\/manager$/i, "");
 }
 
 async function enviarTextoCru(
@@ -52,19 +69,35 @@ async function enviarTextoCru(
   }
 
   const url =
-    `${cred.baseUrl.replace(/\/+$/, "")}` +
+    `${normalizarBaseUrl(cred.baseUrl)}` +
     `/message/sendText/${encodeURIComponent(cred.instancia)}`;
+  const numero = destino(para);
 
-  try {
-    const resp = await fetch(url, {
+  const enviar = (body: unknown) =>
+    fetch(url, {
       method: "POST",
       headers: { apikey: cred.token, "Content-Type": "application/json" },
-      body: JSON.stringify({ number: destino(para), text: texto }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(TIMEOUT_MS),
       cache: "no-store",
     });
 
-    const json = (await resp.json().catch(() => ({}))) as RespostaEvolution;
+  try {
+    let resp = await enviar({ number: numero, text: texto });
+    let json = (await resp.json().catch(() => ({}))) as RespostaEvolution;
+
+    // Formato do corpo mudou entre versões da Evolution API: v2 aceita
+    // `{ number, text }`, versões mais antigas (v1) exigem `{ number,
+    // textMessage: { text } }` e rejeitam o formato novo com 400. Como o
+    // cliente aponta para uma instância self-hosted própria, não dá para
+    // saber a versão de antemão — tenta o formato antigo antes de desistir.
+    if (resp.status === 400) {
+      const respAntiga = await enviar({ number: numero, textMessage: { text: texto } });
+      if (respAntiga.status < 400) {
+        resp = respAntiga;
+        json = (await respAntiga.json().catch(() => ({}))) as RespostaEvolution;
+      }
+    }
 
     if (resp.status >= 400) {
       return {
@@ -106,7 +139,7 @@ export const evolution: Provedor = {
     }
 
     const url =
-      `${cred.baseUrl.replace(/\/+$/, "")}` +
+      `${normalizarBaseUrl(cred.baseUrl)}` +
       `/instance/connectionState/${encodeURIComponent(cred.instancia)}`;
 
     try {
@@ -121,10 +154,17 @@ export const evolution: Provedor = {
       };
 
       if (resp.status === 401 || resp.status === 403) {
-        return { ok: false as const, erro: "chave da API recusada pela instância", codigo: "auth" };
+        // `codigo` casa com o `name` do input no formulário de conexão — é o
+        // que faz o erro acender embaixo do campo certo em vez de só um aviso
+        // genérico no topo. Ver `CAMPO_POR_CODIGO` em actions/conexoes.ts.
+        return { ok: false as const, erro: "chave da API recusada pela instância", codigo: "token" };
       }
       if (resp.status === 404) {
-        return { ok: false as const, erro: `instância "${cred.instancia}" não existe nessa URL`, codigo: "404" };
+        return {
+          ok: false as const,
+          erro: `instância "${cred.instancia}" não existe nessa URL`,
+          codigo: "instancia",
+        };
       }
       if (resp.status >= 400) {
         return { ok: false as const, erro: mensagemDeErro(json, resp.status), codigo: String(resp.status) };
